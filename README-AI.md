@@ -32,7 +32,7 @@
 
 - Build payload: `bun run build:deploy-source`.
 - Verify existing payload: `bun run verify:deploy-source`.
-- Deploy payload: `POST /api/dynamic-workers/apps/:slug/deploy-source` with `deploy-source-payload.generated.json`.
+- Deploy payload: call the main service `light_systems_deploy_source` MCP tool with the generated `deploy-source-payload.generated.json` path; the legacy HTTP deploy-source endpoint is disabled.
 - App runtime: `/light-systems/:slug`.
 - Required API for every generated app: `/api/health`.
 - Starter example APIs: `/api/records`, `/api/stats`, `/api/http-binding-probe`.
