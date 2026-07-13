@@ -104,10 +104,11 @@ async function buildClient(): Promise<{ js: string; css: string }> {
 async function buildWorkerSource(assets: { js: string; css: string }, version: string): Promise<string> {
 	const built = await Bun.build({
 		entrypoints: [WORKER_SOURCE_PATH],
-		external: ["cloudflare:workers", "hono"],
+		// 部署端不会安装 npm 依赖，只保留 workerd 原生提供的平台模块。
+		external: ["cloudflare:workers"],
 		format: "esm",
 		minify: false,
-		packages: "external",
+		packages: "bundle",
 		target: "browser",
 		write: false,
 	});
