@@ -4,7 +4,12 @@
  * @returns 带轻系统 base path 的 URL
  */
 function apiUrl(path: string): string {
-	const basePath = window.location.pathname.replace(/\/$/, "");
+	const matched = window.location.pathname.match(/^\/light-systems\/[^/]+/);
+	if (!matched) {
+		throw new Error("Light System mount path is missing");
+	}
+	// 深层 SPA 路由仍必须请求 slug 根目录下的 API，不能把当前页面路径误当成 base path。
+	const basePath = matched[0];
 	return `${basePath}${path}`;
 }
 

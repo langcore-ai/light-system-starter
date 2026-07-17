@@ -24,7 +24,7 @@
 - `src/server/routes/*` owns HTTP route registration.
 - `src/server/routes/http-binding-probe.ts` demonstrates the custom `HTTP.fetch()` binding that proxies allowed outbound requests through the main Worker.
 - `src/server/db/*` owns SQLite schema and repository operations.
-- `src/server/lib/*` owns server-only HTML, HTTP, and validation helpers.
+- `src/server/lib/*` owns server-only HTML, HTTP, and validation helpers; the HTML shell inlines the client bundle because generated documents use an opaque origin.
 - `scripts/build-deploy-source.ts` builds client JS/CSS, injects them into the worker source, and writes `deploy-source-payload.generated.json`.
 - `scripts/verify-deploy-source.ts` verifies the generated payload before deployment.
 
@@ -41,9 +41,10 @@
 
 - Keep `src/server/worker.ts`, `src/client/main.tsx`, `scripts/build-deploy-source.ts`, and `deploy-source-payload.generated.json` paths stable.
 - Keep component-library generated files inside this repo. Do not write shadcn, Hero UI, Radix, or local UI primitives into the main app.
-- Browser code must be bundled before deployment; `src/server/worker.ts` should serve embedded assets, not import React at runtime.
+- Browser code must be bundled before deployment and emitted as self-contained HTML; `src/server/worker.ts` should serve embedded assets, not import React at runtime or require same-app browser asset requests.
 - Structured data must use `this.ctx.storage.sql` inside the Durable Object Facet.
 - Public network access must use the injected `this.env.HTTP.fetch()` binding. Do not rely on global `fetch()` for outbound requests.
 - API URLs in the browser must be relative to the mounted app path, not hardcoded as `/api/...`.
+- Generated HTML runs without `allow-same-origin`: browser storage/Cookie APIs and main-app credentials are unavailable. The platform-wrapped global `fetch()` only attaches an app capability to the current `/light-systems/:slug/*` mount; external domains remain allowed and are governed by their own CORS responses.
 - Keep `src/shared/*` side-effect free and runtime neutral so both frontend and backend can import it safely.
 - Keep generated deploy payload verification green before submitting to the main service.

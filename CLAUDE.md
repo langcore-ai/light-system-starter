@@ -12,6 +12,7 @@ The app is not part of the main Neo Noumi frontend or backend. It owns its own R
 - Backend entry must export `class App extends DurableObject`.
 - App data lives in this app's Durable Object Facet SQLite storage.
 - Browser code must be bundled before deployment and embedded into the Worker source.
+- The HTML shell must be self-contained: inline the built client JS and CSS instead of loading same-app script or stylesheet URLs.
 - The main service only receives `deploy-source-payload.generated.json`; it should not infer structure from loose source files.
 
 ## Directory Boundaries
@@ -72,6 +73,10 @@ Do not expose main-service cookies, secrets, database URLs, or privileged bindin
 - Import global styles from `src/client/styles.css`.
 - Keep API URLs compatible with path-mounted apps like `/light-systems/:slug`.
 - Do not hardcode browser fetch paths as `/api/...`; use the local API client helper.
+- The platform runs generated HTML in a CSP sandbox with scripts enabled but without `allow-same-origin`. Browser `localStorage`, `sessionStorage`, IndexedDB, `document.cookie`, Service Workers, and main-app ambient credentials are unavailable.
+- Use the platform-installed global `fetch()` for this app's own `/light-systems/:slug/*` API. Do not capture or replace `fetch` before application startup; the platform attaches and renews the app-scoped capability there.
+- Browser requests to other domains are allowed by default, but JavaScript can read their responses only when the target server's CORS policy permits it.
+- Main-service `/api/*` routes are not an integration surface for generated code. Use explicit share links/capabilities or the app's backend `HTTP.fetch()` binding instead.
 - Keep generated component-library files inside this repository.
 - Do not import the main Neo Noumi app's shadcn components.
 
@@ -101,6 +106,7 @@ The generated Worker source must not contain unresolved placeholders or runtime-
 - Do not run shell commands or child processes at runtime.
 - Do not install packages at runtime.
 - Do not use remote dynamic imports.
+- Do not load browser JS, CSS, fonts, or images from relative same-app asset URLs; bundle or inline them into the HTML shell. External assets remain subject to the external host's CORS/CSP behavior.
 - Do not create new Durable Object namespaces.
 - Do not depend on the main app's React, routes, database, or private bindings.
 - Do not assume requests always hit the same in-memory instance; persistent state must be stored in SQLite.

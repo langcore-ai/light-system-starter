@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { htmlResponse, javascriptResponse } from "../lib/http";
+import { htmlResponse } from "../lib/http";
 import { renderHtmlShell } from "../lib/html-shell";
 
 /**
@@ -9,10 +9,6 @@ import { renderHtmlShell } from "../lib/html-shell";
  */
 export function registerAssetRoutes(app: Hono, assets: { clientBundle: string; clientStyle: string }): void {
 	app.get("*", (c) => {
-		const url = new URL(c.req.url);
-		if (url.searchParams.get("asset") === "client") {
-			return javascriptResponse(assets.clientBundle);
-		}
-		return htmlResponse(renderHtmlShell({ clientStyle: assets.clientStyle }));
+		return htmlResponse(renderHtmlShell(assets));
 	});
 }
