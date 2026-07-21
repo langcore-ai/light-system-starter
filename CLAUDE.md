@@ -71,10 +71,10 @@ Do not expose main-service cookies, secrets, database URLs, or privileged bindin
 
 - Use React for UI.
 - Import global styles from `src/client/styles.css`.
-- Keep API URLs compatible with path-mounted apps like `/light-systems/:slug`.
-- Do not hardcode browser fetch paths as `/api/...`; use the local API client helper.
+- Call this app's browser APIs with string path references such as `fetch("/api/records")`; the platform resolves both `/api/records` and `./api/records` from the light-system virtual root, including on deep SPA routes.
+- Do not hardcode `/light-systems/:slug` or derive it from `location.pathname`; use the local API client helper when JSON/error handling is useful.
 - The platform runs generated HTML in a CSP sandbox with scripts enabled but without `allow-same-origin`. Browser `localStorage`, `sessionStorage`, IndexedDB, `document.cookie`, Service Workers, and main-app ambient credentials are unavailable.
-- Use the platform-installed global `fetch()` for this app's own `/light-systems/:slug/*` API. Do not capture or replace `fetch` before application startup; the platform attaches and renews the app-scoped capability there.
+- Use the platform-installed global `fetch()` for this app's own API. Do not capture or replace `fetch` before application startup; the platform maps string path references to `/light-systems/:slug/*`, then attaches and renews the app-scoped capability. Explicit absolute URL and `Request` inputs are not converted into app-relative requests.
 - Browser requests to other domains are allowed by default, but JavaScript can read their responses only when the target server's CORS policy permits it.
 - Main-service `/api/*` routes are not an integration surface for generated code. Use explicit share links/capabilities or the app's backend `HTTP.fetch()` binding instead.
 - Keep generated component-library files inside this repository.
