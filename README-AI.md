@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and the deterministic build that writes `static-bundle.generated.json`. It has no server entrypoint, database, runtime process, Worker binding, or platform credential.
+This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and a deterministic build that writes `dist/index.html`. It has no server entrypoint, database, runtime process, Worker binding, or platform credential.
 
 ## Structure
 
@@ -10,18 +10,18 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `src/client/app.tsx`: page state and product UI.
 - `src/client/components/ui/*`: local component primitives.
 - `src/client/styles.css`: Tailwind CSS v4 entry and semantic tokens.
-- `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `index.html` inside the static bundle.
-- `scripts/verify-static.ts`: verifies the platform publication contract.
-- `static-bundle.generated.json`: generated artifact committed with the source change.
+- `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`.
+- `scripts/verify-static.ts`: verifies the browser-only build output.
+- `dist/`: ignored local build output; the platform rebuilds it from the synchronized source commit.
 
 ## Commands
 
 ```bash
 bun run typecheck
-bun run build:static
+bun run build
 ```
 
-After committing the generated bundle, call `light_systems_artifacts_sync`, then call `light_systems_deploy_static` with the returned full commit SHA and the absolute `static-bundle.generated.json` path.
+Commit source changes only, call `light_systems_artifacts_sync`, then call `light_systems_deploy_static` with the returned full commit SHA. Deployment clones that exact commit into a disposable builder, runs `bun run build`, validates `dist/`, and stores the static files in object storage.
 
 ## Runtime boundary
 
@@ -34,4 +34,4 @@ After committing the generated bundle, call `light_systems_artifacts_sync`, then
 
 ## Contract
 
-`static-bundle.generated.json` must use schema version 1, entrypoint `index.html`, and a `files` map. The starter intentionally emits only self-contained `index.html`. The backend reads this file from the exact synced Git commit, validates it, stores immutable files in object storage, then atomically promotes the manifest pointer.
+The source repository must remain buildable with `bun run build` and must not commit `dist/`. The build must emit `dist/index.html`; the starter intentionally keeps it self-contained. The platform validates all output paths, MIME types, file counts, and byte limits before storing immutable files and atomically promoting the manifest pointer.

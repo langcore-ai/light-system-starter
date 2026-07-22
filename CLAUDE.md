@@ -8,8 +8,8 @@ Build a standalone React application that runs entirely in the browser. There is
 
 1. Implement the requested UI and browser behavior under `src/client/`.
 2. Run `bun run typecheck`.
-3. Run `bun run build:static`.
-4. Commit source changes and `static-bundle.generated.json`.
+3. Run `bun run build`.
+4. Commit source changes only. `dist/` is ignored and must not be committed.
 5. Call `light_systems_artifacts_sync`.
 6. Call `light_systems_deploy_static` with the exact returned commit SHA.
 
@@ -32,7 +32,7 @@ Build a standalone React application that runs entirely in the browser. There is
 ## Completion checklist
 
 - `bun run typecheck` passes.
-- `bun run build:static` passes.
-- The generated bundle contains no backend/runtime code.
+- `bun run build` passes.
+- The generated `dist/index.html` contains no backend/runtime code.
 - The page works without `/api/*`.
-- The source and generated bundle are committed before sync and deployment.
+- Only source/configuration files are committed before sync and deployment.

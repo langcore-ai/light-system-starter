@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -10,8 +10,11 @@ const ROOT_DIR = new URL("..", import.meta.url).pathname;
 /** 浏览器入口。 */
 const CLIENT_ENTRY_PATH = join(ROOT_DIR, "src/client/main.tsx");
 
-/** 平台读取的固定静态包路径。 */
-const OUTPUT_PATH = join(ROOT_DIR, "static-bundle.generated.json");
+/** 平台隔离构建器读取的标准 Vite 输出目录。 */
+const OUTPUT_DIR = join(ROOT_DIR, "dist");
+
+/** 轻系统固定 HTML 入口。 */
+const OUTPUT_PATH = join(OUTPUT_DIR, "index.html");
 
 /** Vite 输出资产的最小结构。 */
 type OutputAsset = {
@@ -25,7 +28,7 @@ function escapeInlineSource(source: string, tagName: "script" | "style"): string
 	return source.replace(new RegExp(`</${tagName}`, "gi"), `<\\/${tagName}`);
 }
 
-/** 构建纯浏览器应用并输出自包含 HTML 静态包。 */
+/** 构建纯浏览器应用并输出自包含 HTML。 */
 async function main() {
 	const result = await buildVite({
 		configFile: false,
@@ -59,18 +62,10 @@ async function main() {
 		throw new Error(`static build emitted non-inline assets: ${unsupported.map((item) => item.fileName).join(", ")}`);
 	}
 	const html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Light System</title><style>${escapeInlineSource(css, "style")}</style></head><body><div id="root" data-light-system-root="true"></div><script type="module">${escapeInlineSource(javascript, "script")}</script></body></html>`;
-	const bundle = {
-		schemaVersion: 1,
-		entrypoint: "index.html",
-		files: {
-			"index.html": {
-				content: html,
-				contentType: "text/html; charset=utf-8",
-				encoding: "utf8",
-			},
-		},
-	};
-	await writeFile(OUTPUT_PATH, `${JSON.stringify(bundle, null, "\t")}\n`);
+	// dist 是一次性构建输出，不属于源码仓库；每次构建都从空目录开始。
+	await rm(OUTPUT_DIR, { force: true, recursive: true });
+	await mkdir(OUTPUT_DIR, { recursive: true });
+	await writeFile(OUTPUT_PATH, html);
 	console.log(JSON.stringify({ output: OUTPUT_PATH, bytes: new TextEncoder().encode(html).byteLength }, null, 2));
 }
 

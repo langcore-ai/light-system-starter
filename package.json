@@ -3,8 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build:static": "bun scripts/build-static.ts && bun scripts/verify-static.ts",
-		"verify:static": "bun scripts/verify-static.ts",
+		"build": "bun scripts/build-static.ts && bun scripts/verify-static.ts",
+		"verify": "bun scripts/verify-static.ts",
 		"typecheck": "bunx tsc --noEmit -p tsconfig.client.json"
 	},
 	"dependencies": {
