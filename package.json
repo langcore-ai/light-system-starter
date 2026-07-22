@@ -3,17 +3,15 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build:deploy-source": "bun scripts/build-deploy-source.ts && bun scripts/verify-deploy-source.ts",
-		"verify:deploy-source": "bun scripts/verify-deploy-source.ts",
-		"typecheck": "bunx tsc --noEmit -p tsconfig.client.json && bunx tsc --noEmit -p tsconfig.worker.json"
+		"build:static": "bun scripts/build-static.ts && bun scripts/verify-static.ts",
+		"verify:static": "bun scripts/verify-static.ts",
+		"typecheck": "bunx tsc --noEmit -p tsconfig.client.json"
 	},
 	"dependencies": {
-		"@cloudflare/workers-types": "^4.20260603.0",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/react": "19.2.7",
 		"@types/react-dom": "19.2.3",
 		"@vitejs/plugin-react": "5.1.1",
-		"hono": "4.11.1",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"lucide-react": "^1.16.0",

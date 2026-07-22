@@ -2,12 +2,34 @@
 
 @theme {
 	--font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--color-background: oklch(0.98 0.004 255);
+	--color-foreground: oklch(0.22 0.02 255);
+	--color-card: oklch(1 0 0);
+	--color-muted: oklch(0.95 0.008 255);
+	--color-muted-foreground: oklch(0.52 0.02 255);
+	--color-primary: oklch(0.55 0.2 260);
+	--color-ring: oklch(0.65 0.17 260);
 }
 
 body {
 	margin: 0;
 	min-height: 100vh;
-	background: #f5f7fb;
-	color: #0f172a;
+	background: var(--color-background);
+	color: var(--color-foreground);
 	font-family: var(--font-sans);
+}
+
+button,
+input {
+	font: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+	@theme {
+		--color-background: oklch(0.17 0.015 255);
+		--color-foreground: oklch(0.95 0.005 255);
+		--color-card: oklch(0.22 0.018 255);
+		--color-muted: oklch(0.28 0.018 255);
+		--color-muted-foreground: oklch(0.72 0.015 255);
+	}
 }
