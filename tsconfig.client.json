@@ -5,6 +5,9 @@
 		"types": ["react", "react-dom"]
 	},
 	"include": [
+		"scripts/noumi-browser-runtime-client.ts",
+		"scripts/noumi-db-sdk.ts",
+		"scripts/noumi-db-sdk.typecheck.ts",
 		"src/client/**/*.tsx",
 		"src/client/**/*.ts"
 	]

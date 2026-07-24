@@ -63,7 +63,7 @@ async function main() {
 		throw new Error(`static build emitted non-inline assets: ${unsupported.map((item) => item.fileName).join(", ")}`);
 	}
 	// Browser Runtime 在业务 bundle 前等待可信外壳握手，确保入口代码执行时 window.NoumiBridge 已可用。
-	const browserRuntime = createNoumiBrowserRuntimeSource();
+	const browserRuntime = await createNoumiBrowserRuntimeSource();
 	const inlineJavascript = `${browserRuntime}\n${javascript}`;
 	const html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Light System</title><style>${escapeInlineSource(css, "style")}</style></head><body><div id="root" data-light-system-root="true"></div><script type="module">${escapeInlineSource(inlineJavascript, "script")}</script></body></html>`;
 	// dist 是一次性构建输出，不属于源码仓库；每次构建都从空目录开始。

@@ -1,6 +1,35 @@
-export {};
+import type {
+	NoumiDatabase as NoumiDatabaseSdk,
+	NoumiDbCapabilities as NoumiDbCapabilitiesSdk,
+	NoumiDbError as NoumiDbErrorSdk,
+	NoumiDbFailure as NoumiDbFailureSdk,
+	NoumiDbJson as NoumiDbJsonSdk,
+	NoumiDbResult as NoumiDbResultSdk,
+	NoumiDbRow as NoumiDbRowSdk,
+	NoumiDbScalar as NoumiDbScalarSdk,
+	NoumiDbSuccess as NoumiDbSuccessSdk,
+} from "../../scripts/noumi-db-sdk";
 
 declare global {
+	/** Noumi DB 支持的标量。 */
+	type NoumiDbScalar = NoumiDbScalarSdk;
+	/** Noumi DB 支持的 JSON。 */
+	type NoumiDbJson = NoumiDbJsonSdk;
+	/** 默认数据库行形状。 */
+	type NoumiDbRow = NoumiDbRowSdk;
+	/** 当前 Browser Runtime/provider 数据库能力。 */
+	type NoumiDbCapabilities = NoumiDbCapabilitiesSdk;
+	/** 稳定数据库错误。 */
+	type NoumiDbError = NoumiDbErrorSdk;
+	/** 成功数据库结果。 */
+	type NoumiDbSuccess<T> = NoumiDbSuccessSdk<T>;
+	/** 失败数据库结果。 */
+	type NoumiDbFailure = NoumiDbFailureSdk;
+	/** 可通过 ok 判别的数据库结果。 */
+	type NoumiDbResult<T> = NoumiDbResultSdk<T>;
+	/** 当前轻系统的共享数据库 SDK。 */
+	type NoumiDatabase = NoumiDatabaseSdk;
+
 	/** 轻系统可见的成员信息。 */
 	interface NoumiMember {
 		/** 成员邮箱。 */
@@ -37,6 +66,8 @@ declare global {
 			/** 判断当前轻系统是否存在指定键。 */
 			has(key: string): Promise<boolean>;
 		};
+		/** 当前轻系统独享 SQLite 的受控 fluent/SQL 数据 API。 */
+		db: NoumiDatabase;
 	}
 
 	interface Window {

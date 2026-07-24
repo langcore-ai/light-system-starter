@@ -1,0 +1,338 @@
+import {
+	createNoumiDatabase,
+	type NoumiDbCapabilities,
+	type NoumiDbTransport,
+} from "./noumi-db-sdk";
+
+/** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
+const BRIDGE_VERSION = 1;
+
+/** iframe 通知可信外壳已准备接收启动上下文。 */
+const BRIDGE_READY_MESSAGE = "noumi:light-system:bridge:ready";
+
+/** 可信外壳向 iframe 返回启动上下文。 */
+const BRIDGE_BOOTSTRAP_MESSAGE = "noumi:light-system:bridge:bootstrap";
+
+/** iframe 请求可信外壳执行受控能力。 */
+const BRIDGE_REQUEST_MESSAGE = "noumi:light-system:bridge:request";
+
+/** 可信外壳返回能力调用结果。 */
+const BRIDGE_RESPONSE_MESSAGE = "noumi:light-system:bridge:response";
+
+/** 启动上下文和单次能力调用的最长等待时间。 */
+const BRIDGE_REQUEST_TIMEOUT_MS = 10_000;
+
+/** Bridge bootstrap 中的成员信息。 */
+type BootstrapMember = {
+	email: string;
+	displayName: string | null;
+};
+
+/** Bridge bootstrap payload。 */
+type BootstrapPayload = {
+	app: { name: string };
+	createByMember: BootstrapMember;
+	currentMember: BootstrapMember | null;
+	databaseCapabilities: NoumiDbCapabilities;
+};
+
+/** 等待中的 Bridge RPC。 */
+type PendingRequest = {
+	resolve(value: unknown): void;
+	reject(reason: unknown): void;
+	timer: ReturnType<typeof setTimeout>;
+};
+
+/** db.request 返回的可结构化克隆 response。 */
+type BridgeDatabaseResponse = {
+	status: number;
+	headers: Array<[string, string]>;
+	body: string;
+};
+
+/** 判断普通 object。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** 校验成员 bootstrap。 */
+function isMember(value: unknown): value is BootstrapMember {
+	return isRecord(value) &&
+		typeof value.email === "string" &&
+		(value.displayName === null || typeof value.displayName === "string");
+}
+
+/** 校验数据库 capability 快照；它只用于 UI fallback，不替代服务端鉴权。 */
+function isDatabaseCapabilities(value: unknown): value is NoumiDbCapabilities {
+	return isRecord(value) &&
+		value.dbProtocolVersion === 1 &&
+		typeof value.structuredCrud === "boolean" &&
+		typeof value.sqlQuery === "boolean" &&
+		typeof value.sqlExecute === "boolean" &&
+		typeof value.operationRecovery === "boolean";
+}
+
+/** 校验父窗口返回的数据库 response。 */
+function isBridgeDatabaseResponse(value: unknown): value is BridgeDatabaseResponse {
+	if (
+		!isRecord(value) ||
+		!Number.isInteger(value.status) ||
+		Number(value.status) < 100 ||
+		Number(value.status) > 599 ||
+		typeof value.body !== "string" ||
+		!Array.isArray(value.headers)
+	) {
+		return false;
+	}
+	const names = new Set<string>();
+	for (const entry of value.headers) {
+		if (
+			!Array.isArray(entry) ||
+			entry.length !== 2 ||
+			typeof entry[0] !== "string" ||
+			typeof entry[1] !== "string"
+		) {
+			return false;
+		}
+		const name = entry[0].toLowerCase();
+		if (
+			!["content-type", "cache-control"].includes(name) ||
+			names.has(name)
+		) {
+			return false;
+		}
+		names.add(name);
+	}
+	return names.has("content-type") &&
+		names.has("cache-control") &&
+		value.headers.some(([name, content]) =>
+			name.toLowerCase() === "content-type" &&
+			content.toLowerCase().startsWith("application/json")
+		) &&
+		value.headers.some(([name, content]) =>
+			name.toLowerCase() === "cache-control" &&
+			content.toLowerCase() === "no-store"
+		);
+}
+
+/** 冻结只读成员上下文。 */
+function freezeMember(member: BootstrapMember): BootstrapMember {
+	return Object.freeze({
+		email: member.email,
+		displayName: member.displayName,
+	});
+}
+
+const channelId = Array.from(
+	crypto.getRandomValues(new Uint32Array(4)),
+	(value) => value.toString(36),
+).join("-");
+const pending = new Map<string, PendingRequest>();
+let requestSequence = 0;
+let bootstrapResolve: (payload: BootstrapPayload) => void;
+let bootstrapReject: (reason: unknown) => void;
+let bootstrapTimer: ReturnType<typeof setTimeout>;
+
+const bootstrap = new Promise<BootstrapPayload>((resolve, reject) => {
+	bootstrapResolve = resolve;
+	bootstrapReject = reject;
+	bootstrapTimer = setTimeout(
+		() => reject(new Error("Noumi iframe bootstrap timed out")),
+		BRIDGE_REQUEST_TIMEOUT_MS,
+	);
+});
+
+addEventListener("message", (event) => {
+	if (
+		event.source !== window.parent ||
+		!isRecord(event.data) ||
+		event.data.version !== BRIDGE_VERSION ||
+		event.data.channelId !== channelId
+	) {
+		return;
+	}
+	if (event.data.type === BRIDGE_BOOTSTRAP_MESSAGE) {
+		const payload = event.data.payload;
+		if (
+			!isRecord(payload) ||
+			!isRecord(payload.app) ||
+			typeof payload.app.name !== "string" ||
+			!isMember(payload.createByMember) ||
+			payload.currentMember !== null && !isMember(payload.currentMember) ||
+			!isDatabaseCapabilities(payload.databaseCapabilities)
+		) {
+			bootstrapReject(new Error("Noumi iframe bootstrap payload is invalid"));
+			return;
+		}
+		clearTimeout(bootstrapTimer);
+		bootstrapResolve(payload as BootstrapPayload);
+		return;
+	}
+	if (
+		event.data.type !== BRIDGE_RESPONSE_MESSAGE ||
+		typeof event.data.requestId !== "string"
+	) {
+		return;
+	}
+	const active = pending.get(event.data.requestId);
+	if (!active) return;
+	pending.delete(event.data.requestId);
+	clearTimeout(active.timer);
+	if (event.data.ok === true) active.resolve(event.data.result);
+	else {
+		active.reject(
+			new Error(
+				typeof event.data.error === "string"
+					? event.data.error
+					: "Noumi capability call failed",
+			),
+		);
+	}
+});
+
+window.parent.postMessage({
+	type: BRIDGE_READY_MESSAGE,
+	version: BRIDGE_VERSION,
+	channelId,
+}, "*");
+
+/** 调用可信父窗口能力。 */
+function call(
+	method: string,
+	params: unknown,
+	signal?: AbortSignal,
+): Promise<unknown> {
+	return new Promise((resolve, reject) => {
+		const requestId = `${Date.now().toString(36)}:${(++requestSequence).toString(36)}`;
+		if (signal?.aborted) {
+			reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+			return;
+		}
+		const abort = () => {
+			const active = pending.get(requestId);
+			if (!active) return;
+			pending.delete(requestId);
+			clearTimeout(active.timer);
+			reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+			// 取消只表示停止等待；父窗口和服务端仍按 operation ID 收敛 mutation。
+			window.parent.postMessage({
+				type: BRIDGE_REQUEST_MESSAGE,
+				version: BRIDGE_VERSION,
+				channelId,
+				requestId: `${requestId}:cancel`,
+				method: "db.cancel",
+				params: { requestId },
+			}, "*");
+		};
+		const timer = setTimeout(() => {
+			pending.delete(requestId);
+			signal?.removeEventListener("abort", abort);
+			reject(new Error("Noumi capability call timed out"));
+			// Query 尽快释放 provider 资源；mutation 仍只把结果视为 unknown。
+			window.parent.postMessage({
+				type: BRIDGE_REQUEST_MESSAGE,
+				version: BRIDGE_VERSION,
+				channelId,
+				requestId: `${requestId}:timeout`,
+				method: "db.cancel",
+				params: { requestId },
+			}, "*");
+		}, BRIDGE_REQUEST_TIMEOUT_MS);
+		pending.set(requestId, {
+			resolve(value) {
+				signal?.removeEventListener("abort", abort);
+				resolve(value);
+			},
+			reject(reason) {
+				signal?.removeEventListener("abort", abort);
+				reject(reason);
+			},
+			timer,
+		});
+		signal?.addEventListener("abort", abort, { once: true });
+		window.parent.postMessage({
+			type: BRIDGE_REQUEST_MESSAGE,
+			version: BRIDGE_VERSION,
+			channelId,
+			requestId,
+			method,
+			params,
+		}, "*");
+	});
+}
+
+/** 校验 localStorage 字符串参数。 */
+function requireString(value: unknown, name: string): string {
+	if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+	return value;
+}
+
+/** 把虚拟 Request 结构化克隆给可信父窗口。 */
+const databaseTransport: NoumiDbTransport = async (request, options) => {
+	const response = await call("db.request", {
+		dbProtocolVersion: 1,
+		url: request.url,
+		method: request.method,
+		headers: [...request.headers.entries()],
+		body: request.body === null ? null : await request.text(),
+	}, options?.signal);
+	if (!isBridgeDatabaseResponse(response)) {
+		throw new Error("Noumi database Bridge response is invalid");
+	}
+	return new Response(response.body, {
+		status: response.status,
+		headers: response.headers,
+	});
+};
+
+const payload = await bootstrap;
+const bridge = Object.freeze({
+	app: Object.freeze({ name: payload.app.name }),
+	createByMember: freezeMember(payload.createByMember),
+	currentMember: payload.currentMember === null
+		? null
+		: freezeMember(payload.currentMember),
+	localStorage: Object.freeze({
+		async setItem(key: string, value: string) {
+			await call("localStorage.setItem", {
+				key: requireString(key, "key"),
+				value: requireString(value, "value"),
+			});
+		},
+		async getItem(key: string) {
+			const value = await call("localStorage.getItem", {
+				key: requireString(key, "key"),
+			});
+			return typeof value === "string" ? value : null;
+		},
+		async removeItem(key: string) {
+			await call("localStorage.removeItem", { key: requireString(key, "key") });
+		},
+		async clear() {
+			await call("localStorage.clear", {});
+		},
+		async length() {
+			const value = await call("localStorage.length", {});
+			return typeof value === "number" ? value : 0;
+		},
+		async keys() {
+			const value = await call("localStorage.keys", {});
+			return Array.isArray(value)
+				? value.filter((item): item is string => typeof item === "string")
+				: [];
+		},
+		async has(key: string) {
+			return await call("localStorage.has", {
+				key: requireString(key, "key"),
+			}) === true;
+		},
+	}),
+	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
+});
+
+Object.defineProperty(window, "NoumiBridge", {
+	value: bridge,
+	writable: false,
+	configurable: false,
+	enumerable: true,
+});
