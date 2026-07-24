@@ -4,6 +4,9 @@
 	"type": "module",
 	"scripts": {
 		"build": "bun scripts/build-static.ts && bun scripts/verify-static.ts",
+		"db:migration:new": "bun scripts/noumi-db-schema.ts migration:new",
+		"db:schema:write": "bun scripts/noumi-db-schema.ts schema:write",
+		"db:validate": "bun scripts/noumi-db-schema.ts validate",
 		"verify": "bun scripts/verify-static.ts",
 		"typecheck": "bunx tsc --noEmit -p tsconfig.client.json"
 	},
