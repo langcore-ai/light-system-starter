@@ -27,9 +27,12 @@ Commit source changes only, call `light_systems_artifacts_sync`, then call `ligh
 
 - Generated code runs in an iframe with `sandbox="allow-scripts"` and without `allow-same-origin`.
 - The platform does not inject a bearer, database handle, main-site fetch wrapper, cookies, secrets, or backend API.
+- The trusted shell injects `window.NoumiBridge` before the application bundle runs. It exposes the app name, creator, current signed-in member, and an asynchronous app-scoped `localStorage` API.
+- `NoumiBridge.localStorage` is backed by the trusted shell's dedicated IndexedDB database and partitioned by Light System ID. It never reads, writes, or clears the main frontend's `window.localStorage`.
+- Browser-local storage is capped at 4 KiB per key, 1 MiB per value, and 5 MiB per Light System.
 - `/api/*` is not a Light System backend and must not be used.
 - Direct requests to external APIs are allowed, but browser CORS rules determine whether JavaScript may read the response.
-- Browser persistence APIs are unavailable in the opaque-origin iframe. Treat app state as in-memory until the platform adds an explicit database handle in a later phase.
+- Native browser persistence APIs remain unavailable in the opaque-origin iframe. Use `window.NoumiBridge.localStorage` for small browser-local state; it is not a shared database or server-side persistence layer.
 - Keep the output self-contained. Same-app JS/CSS/image assets should be bundled or inlined by the build.
 
 ## Contract

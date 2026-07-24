@@ -19,6 +19,8 @@ async function main() {
 	const index = await readFile(ENTRYPOINT_PATH, "utf8");
 	assert(index.includes('data-light-system-root="true"'), "React root marker is missing");
 	assert(index.includes("__LIGHT_SYSTEM_REACT_SPA_READY__"), "React ready marker is missing");
+	assert(index.includes('"NoumiBridge"'), "NoumiBridge runtime is missing");
+	assert(index.includes("noumi:light-system:bridge:ready"), "NoumiBridge handshake is missing");
 	assert(!index.includes("/api/health"), "backend health API must not exist in a static app");
 	assert(!index.includes("DurableObject"), "Dynamic Worker code must not be bundled");
 	console.log(JSON.stringify({ ok: true, entrypoint: "index.html" }, null, 2));

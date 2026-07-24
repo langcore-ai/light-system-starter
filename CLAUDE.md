@@ -15,8 +15,9 @@ Build a standalone React application that runs entirely in the browser. There is
 
 ## Browser constraints
 
-- The document runs in an opaque-origin iframe: scripts work, but `localStorage`, `sessionStorage`, IndexedDB, cookies, Service Workers, and main-site ambient authority are unavailable.
-- Keep business state in React memory for now. Clearly tell users when data does not persist after refresh.
+- The document runs in an opaque-origin iframe: scripts work, but native `localStorage`, `sessionStorage`, IndexedDB, cookies, Service Workers, and main-site ambient authority are unavailable.
+- The platform initializes `window.NoumiBridge` before the business bundle runs. Use its read-only `app`, `createByMember`, and `currentMember` context instead of inventing identity state.
+- Use the asynchronous `window.NoumiBridge.localStorage` API for small browser-local state. It is partitioned by Light System ID, isolated from the main frontend's localStorage, and capped at 5 MiB per Light System; it is not a shared database.
 - You may call explicit external HTTPS APIs. Their CORS policy must allow browser access.
 - Never call relative `/api/*`; Neo Noumi does not provide a Light System backend in this phase.
 - Never request or embed main-site tokens, cookies, project IDs as authorization, database URLs, or object-storage credentials.
