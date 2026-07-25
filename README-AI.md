@@ -10,11 +10,11 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `src/client/app.tsx`: page state and product UI.
 - `src/client/components/ui/*`: local component primitives.
 - `src/client/styles.css`: Tailwind CSS v4 entry and semantic tokens.
-- `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`.
+- `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`; the independently minified Browser Runtime and business bundle run in sequential isolated scopes so their short identifiers cannot collide.
 - `scripts/noumi-db-sdk.ts`: browser-only fluent/controlled-SQL SDK that produces virtual v1 Requests.
 - `scripts/noumi-db-schema.ts`: local migration replay, registry/hash generation and validation CLI.
 - `scripts/noumi-browser-runtime-client.ts`: validates the parent Bridge bootstrap and injects `window.NoumiBridge`.
-- `scripts/verify-static.ts`: verifies the browser-only build output.
+- `scripts/verify-static.ts`: parses and verifies the final inline browser module instead of checking only marker strings.
 - `noumi.db.json` and `db/migrations/*.sql`: shared database policy and append-only schema history.
 - `dist/`: ignored local build output; the platform rebuilds it from the synchronized source commit.
 
