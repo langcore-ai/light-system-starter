@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { transformWithEsbuild } from "vite";
 
 /** 平台隔离构建器读取的标准静态输出目录。 */
 const DIST_PATH = join(new URL("..", import.meta.url).pathname, "dist");
@@ -17,6 +18,15 @@ async function main() {
 	const entries = await readdir(DIST_PATH, { recursive: true });
 	assert(entries.length === 1 && entries[0] === "index.html", "starter must emit one self-contained index.html");
 	const index = await readFile(ENTRYPOINT_PATH, "utf8");
+	const inlineModule = index.match(
+		/<script type="module">([\s\S]*?)<\/script>/i,
+	)?.[1];
+	assert(inlineModule, "inline browser module is missing");
+	// 两段独立压缩的 bundle 即使都能单独解析，直接拼接后仍可能变量重名。
+	await transformWithEsbuild(inlineModule, "index.js", {
+		format: "esm",
+		target: "es2022",
+	});
 	assert(index.includes('data-light-system-root="true"'), "React root marker is missing");
 	assert(index.includes("__LIGHT_SYSTEM_REACT_SPA_READY__"), "React ready marker is missing");
 	assert(index.includes('"NoumiBridge"'), "NoumiBridge runtime is missing");
