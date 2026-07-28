@@ -224,11 +224,11 @@ export function AppStorageTestPanel() {
 				{downloadUrl && (
 					<a
 						className="mt-2 inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+						download
 						href={downloadUrl}
 						rel="noreferrer"
-						target="_blank"
 					>
-						打开一次性下载 URL
+						下载文件
 					</a>
 				)}
 				<ul className="mt-3 grid gap-1 text-xs">

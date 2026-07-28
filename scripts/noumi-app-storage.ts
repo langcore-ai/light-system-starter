@@ -479,8 +479,8 @@ export function createNoumiAppStorage(
 				throw new Error("Noumi App Storage list response is invalid");
 			}
 			return Object.freeze({
-				objects: Object.freeze(data.objects.map(parseObject)),
-				directories: Object.freeze([...data.directories]),
+				objects: data.objects.map(parseObject),
+				directories: [...data.directories],
 				cursor: data.cursor,
 			});
 		},
