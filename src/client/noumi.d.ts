@@ -26,6 +26,24 @@ import type {
 	NoumiFileRange as NoumiFileRangeSdk,
 	NoumiFileTransportError as NoumiFileTransportErrorSdk,
 } from "../../scripts/noumi-app-storage";
+import type {
+	NoumiWorkspaceCopyOptions as NoumiWorkspaceCopyOptionsSdk,
+	NoumiWorkspaceCreateDirectoryOptions as NoumiWorkspaceCreateDirectoryOptionsSdk,
+	NoumiWorkspaceDownloadUrlOptions as NoumiWorkspaceDownloadUrlOptionsSdk,
+	NoumiWorkspaceEntry as NoumiWorkspaceEntrySdk,
+	NoumiWorkspaceFile as NoumiWorkspaceFileSdk,
+	NoumiWorkspaceFiles as NoumiWorkspaceFilesSdk,
+	NoumiWorkspaceListOptions as NoumiWorkspaceListOptionsSdk,
+	NoumiWorkspaceListPage as NoumiWorkspaceListPageSdk,
+	NoumiWorkspaceMoveOptions as NoumiWorkspaceMoveOptionsSdk,
+	NoumiWorkspaceReadOptions as NoumiWorkspaceReadOptionsSdk,
+	NoumiWorkspaceRemoveOptions as NoumiWorkspaceRemoveOptionsSdk,
+	NoumiWorkspaceRemoveResult as NoumiWorkspaceRemoveResultSdk,
+	NoumiWorkspaceRequestOptions as NoumiWorkspaceRequestOptionsSdk,
+	NoumiWorkspaceTextFile as NoumiWorkspaceTextFileSdk,
+	NoumiWorkspaceTextReadOptions as NoumiWorkspaceTextReadOptionsSdk,
+	NoumiWorkspaceWriteOptions as NoumiWorkspaceWriteOptionsSdk,
+} from "../../scripts/noumi-workspace-files";
 
 declare global {
 	/** Noumi DB 支持的标量。 */
@@ -76,6 +94,40 @@ declare global {
 	type NoumiFileTransportError = NoumiFileTransportErrorSdk;
 	/** 当前轻系统独享的跨 deployment 对象存储。 */
 	type NoumiAppStorage = NoumiAppStorageSdk;
+	/** Workspace 公开节点。 */
+	type NoumiWorkspaceEntry = NoumiWorkspaceEntrySdk;
+	/** Workspace 二进制文件读取结果。 */
+	type NoumiWorkspaceFile = NoumiWorkspaceFileSdk;
+	/** Workspace UTF-8 文本读取结果。 */
+	type NoumiWorkspaceTextFile = NoumiWorkspaceTextFileSdk;
+	/** Workspace 文件读取选项。 */
+	type NoumiWorkspaceReadOptions = NoumiWorkspaceReadOptionsSdk;
+	/** Workspace 文本读取选项。 */
+	type NoumiWorkspaceTextReadOptions = NoumiWorkspaceTextReadOptionsSdk;
+	/** Workspace 目录分页选项。 */
+	type NoumiWorkspaceListOptions = NoumiWorkspaceListOptionsSdk;
+	/** Workspace 目录分页结果。 */
+	type NoumiWorkspaceListPage = NoumiWorkspaceListPageSdk;
+	/** Workspace 文件写入选项。 */
+	type NoumiWorkspaceWriteOptions = NoumiWorkspaceWriteOptionsSdk;
+	/** Workspace 目录创建选项。 */
+	type NoumiWorkspaceCreateDirectoryOptions =
+		NoumiWorkspaceCreateDirectoryOptionsSdk;
+	/** Workspace move 选项。 */
+	type NoumiWorkspaceMoveOptions = NoumiWorkspaceMoveOptionsSdk;
+	/** Workspace copy 选项。 */
+	type NoumiWorkspaceCopyOptions = NoumiWorkspaceCopyOptionsSdk;
+	/** Workspace remove 选项。 */
+	type NoumiWorkspaceRemoveOptions = NoumiWorkspaceRemoveOptionsSdk;
+	/** Workspace remove 结果。 */
+	type NoumiWorkspaceRemoveResult = NoumiWorkspaceRemoveResultSdk;
+	/** Workspace 下载 URL 选项。 */
+	type NoumiWorkspaceDownloadUrlOptions =
+		NoumiWorkspaceDownloadUrlOptionsSdk;
+	/** Workspace 通用请求选项。 */
+	type NoumiWorkspaceRequestOptions = NoumiWorkspaceRequestOptionsSdk;
+	/** 当前轻系统所属 Project 的 Workspace 文件 SDK。 */
+	type NoumiWorkspaceFiles = NoumiWorkspaceFilesSdk;
 
 	/** 轻系统可见的成员信息。 */
 	interface NoumiMember {
@@ -117,6 +169,8 @@ declare global {
 		};
 		/** 按不可变 LightSystem.id 隔离、跨 deployment 保留的对象存储。 */
 		readonly appStorage: NoumiAppStorage;
+		/** 代表当前成员操作当前轻系统所属 Project 的 Workspace 文件。 */
+		readonly workspaceFiles: NoumiWorkspaceFiles;
 		/** 当前轻系统独享 SQLite 的受控 fluent/SQL 数据 API。 */
 		db: NoumiDatabase;
 	}

@@ -12,6 +12,10 @@ import {
 	type NoumiAppStorageControlTransport,
 	type NoumiFileCapabilities,
 } from "./noumi-app-storage";
+import {
+	createNoumiWorkspaceFiles,
+	type NoumiWorkspaceFilesControlTransport,
+} from "./noumi-workspace-files";
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
@@ -44,6 +48,7 @@ type BootstrapPayload = {
 	currentMember: BootstrapMember | null;
 	databaseCapabilities: NoumiDbCapabilities;
 	appStorageCapabilities: NoumiFileCapabilities;
+	workspaceFilesCapabilities: NoumiFileCapabilities;
 };
 
 /** 等待中的 Bridge RPC。 */
@@ -223,7 +228,8 @@ addEventListener("message", (event) => {
 			!isMember(payload.createByMember) ||
 			payload.currentMember !== null && !isMember(payload.currentMember) ||
 			!isDatabaseCapabilities(payload.databaseCapabilities) ||
-			!isAppStorageCapabilities(payload.appStorageCapabilities)
+			!isAppStorageCapabilities(payload.appStorageCapabilities) ||
+			!isAppStorageCapabilities(payload.workspaceFilesCapabilities)
 		) {
 			bootstrapReject(new Error("Noumi iframe bootstrap payload is invalid"));
 			return;
@@ -296,6 +302,8 @@ function call(
 		const requestId = crypto.randomUUID();
 		const cancelMethod = method === "appStorage.request"
 			? "appStorage.cancel"
+			: method === "workspaceFiles.request"
+				? "workspaceFiles.cancel"
 			: method === "db.request"
 				? "db.cancel"
 				: null;
@@ -411,6 +419,25 @@ const appStorageTransport: NoumiAppStorageControlTransport = async (
 	});
 };
 
+/** Workspace Files control JSON 通过可信父外壳；bytes 直接走 ticket URL。 */
+const workspaceFilesTransport: NoumiWorkspaceFilesControlTransport = async (
+	request,
+	options,
+) => {
+	const response = await call(
+		"workspaceFiles.request",
+		request,
+		options?.signal,
+	);
+	if (!isBridgeDatabaseResponse(response)) {
+		throw new Error("Noumi Workspace Files Bridge response is invalid");
+	}
+	return new Response(response.body, {
+		status: response.status,
+		headers: response.headers,
+	});
+};
+
 const payload = await bootstrap;
 const bridge = Object.freeze({
 	app: Object.freeze({ name: payload.app.name }),
@@ -461,6 +488,10 @@ const bridge = Object.freeze({
 	appStorage: createNoumiAppStorage(
 		appStorageTransport,
 		payload.appStorageCapabilities,
+	),
+	workspaceFiles: createNoumiWorkspaceFiles(
+		workspaceFilesTransport,
+		payload.workspaceFilesCapabilities,
 	),
 	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
 });
