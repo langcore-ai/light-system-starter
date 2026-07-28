@@ -12,6 +12,7 @@ import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
 import { AppStorageTestPanel } from "./app-storage-test-panel";
 import { DiagnosticsTestPanel } from "./diagnostics-test-panel";
+import { WorkspaceFilesTestPanel } from "./workspace-files-test-panel";
 
 /** Starter migration 创建的共享任务行。 */
 type Task = {
@@ -266,6 +267,7 @@ export function App() {
 				</Card>
 
 				<AppStorageTestPanel />
+				<WorkspaceFilesTestPanel />
 				<DiagnosticsTestPanel />
 			</div>
 		</main>
