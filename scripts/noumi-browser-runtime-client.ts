@@ -3,6 +3,10 @@ import {
 	type NoumiDbCapabilities,
 	type NoumiDbTransport,
 } from "./noumi-db-sdk";
+import {
+	NoumiClientDiagnosticsReporter,
+	type NoumiReportErrorOptions,
+} from "./noumi-client-diagnostics";
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
@@ -49,6 +53,48 @@ type BridgeDatabaseResponse = {
 	headers: Array<[string, string]>;
 	body: string;
 };
+
+/** 页面级错误探针在业务 bundle 之前安装，bootstrap 前错误先进入有界队列。 */
+const diagnosticsReporter = new NoumiClientDiagnosticsReporter();
+
+addEventListener("error", (event) => {
+	// 资源 error 不冒泡，必须使用捕获阶段；监听器只观察，不调用 preventDefault。
+	if (event.target && event.target !== window) {
+		diagnosticsReporter.captureResourceError(event.target as {
+			tagName?: unknown;
+			src?: unknown;
+			href?: unknown;
+			currentSrc?: unknown;
+		});
+		return;
+	}
+	diagnosticsReporter.captureRuntimeError({
+		error: event.error,
+		message: event.message,
+		filename: event.filename,
+		lineno: event.lineno,
+		colno: event.colno,
+	});
+}, true);
+
+addEventListener("unhandledrejection", (event) => {
+	// 不取消浏览器默认行为，原始 rejection 仍显示在 DevTools。
+	diagnosticsReporter.captureUnhandledRejection(event.reason);
+});
+
+addEventListener("pagehide", () => {
+	// pagehide 只尝试同步 postMessage，HTTPS transport 由可信父外壳 best-effort 完成。
+	diagnosticsReporter.flush();
+});
+
+Object.defineProperty(window, "__NOUMI_REPORT_REACT_ERROR__", {
+	value(error: unknown, componentStack: unknown) {
+		diagnosticsReporter.reportBoundaryError(error, componentStack);
+	},
+	writable: false,
+	configurable: false,
+	enumerable: false,
+});
 
 /** 判断普通 object。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -165,6 +211,7 @@ addEventListener("message", (event) => {
 			return;
 		}
 		clearTimeout(bootstrapTimer);
+		diagnosticsReporter.setChannel(channelId);
 		bootstrapResolve(payload as BootstrapPayload);
 		return;
 	}
@@ -292,6 +339,11 @@ const bridge = Object.freeze({
 	currentMember: payload.currentMember === null
 		? null
 		: freezeMember(payload.currentMember),
+	diagnostics: Object.freeze({
+		reportError(error: unknown, options?: NoumiReportErrorOptions): void {
+			diagnosticsReporter.reportError(error, options);
+		},
+	}),
 	localStorage: Object.freeze({
 		async setItem(key: string, value: string) {
 			await call("localStorage.setItem", {

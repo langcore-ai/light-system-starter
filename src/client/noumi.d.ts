@@ -49,6 +49,8 @@ declare global {
 		createByMember: NoumiMember;
 		/** 当前登录成员；公开匿名访问时为空。 */
 		currentMember: NoumiMember | null;
+		/** 当前页面的 best-effort 客户端错误诊断能力。 */
+		diagnostics: NoumiDiagnostics;
 		/** 与主前端 localStorage 隔离、按当前轻系统分区的异步浏览器存储。 */
 		localStorage: {
 			/** 写入字符串值。 */
@@ -70,11 +72,29 @@ declare global {
 		db: NoumiDatabase;
 	}
 
+	/** 主动报告已被业务代码捕获的异常；该调用不等待网络且永不抛出上报错误。 */
+	interface NoumiDiagnostics {
+		reportError(error: unknown, options?: NoumiReportErrorOptions): void;
+	}
+
+	/** 主动上报的稳定、低基数诊断标签。 */
+	interface NoumiReportErrorOptions {
+		component?: string;
+		operation?: string;
+		tags?: Readonly<Record<string, string | number | boolean | null>>;
+	}
+
 	interface Window {
 		/**
 		 * 业务 bundle 执行前已完成初始化。
 		 * 身份验证仍由主系统 Cookie/Session 负责，这里只包含显式只读上下文和受控能力。
 		 */
 		NoumiBridge: NoumiBridge;
+		/** starter Error Boundary 专用内部入口，不属于公共 NoumiBridge API。 */
+		__NOUMI_REPORT_REACT_ERROR__(
+			error: unknown,
+			componentStack: unknown,
+		): void;
+		__LIGHT_SYSTEM_REACT_SPA_READY__?: boolean;
 	}
 }
