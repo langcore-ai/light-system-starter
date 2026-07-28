@@ -56,7 +56,10 @@ function parseManifest(value: unknown) {
 		manifest.dialect !== "sqlite" ||
 		manifest.migrationsDir !== "db/migrations" ||
 		typeof manifest.schemaVersion !== "string" ||
-		!/^sha256:[0-9a-f]{64}$/.test(manifest.schemaVersion) ||
+		!(
+			manifest.schemaVersion === "platform" ||
+			/^sha256:[0-9a-f]{64}$/.test(manifest.schemaVersion)
+		) ||
 		!manifest.tables ||
 		typeof manifest.tables !== "object" ||
 		Array.isArray(manifest.tables)
@@ -171,13 +174,11 @@ async function generate(rootInput: string) {
 	const entries = (await readdir(resolve(root, manifest.migrationsDir), {
 		withFileTypes: true,
 	})).sort((left, right) => left.name.localeCompare(right.name));
-	if (entries.length > 64) throw new Error("database contains too many migrations");
 	const migrations: Array<{ id: string; checksum: string }> = [];
 	const database = new Database(":memory:", { strict: true });
 	try {
 		database.exec("PRAGMA foreign_keys = ON");
 		let previousId = "";
-		let migrationBytes = 0;
 		for (const entry of entries) {
 			const match = entry.isFile() ? MIGRATION_FILE.exec(entry.name) : null;
 			if (!match || match[1]! <= previousId) {
@@ -195,10 +196,6 @@ async function generate(rootInput: string) {
 			const bytes = new TextEncoder().encode(sql).byteLength;
 			if (bytes > 256 * 1024) {
 				throw new Error(`migration is too large: ${entry.name}`);
-			}
-			migrationBytes += bytes;
-			if (migrationBytes > 1024 * 1024) {
-				throw new Error("database migrations exceed total byte limit");
 			}
 			database.exec(sql);
 			migrations.push({ id: previousId, checksum: await sha256(sql) });
@@ -320,7 +317,9 @@ async function main() {
 		const filePath = resolve("db/migrations", `${migrationId()}_${slug}.sql`);
 		const file = await open(filePath, "wx");
 		try {
-			await file.writeFile("-- Noumi DB forward migration\n");
+			await file.writeFile(
+				'-- noumi:migration-risk {"level":"safe","summary":"Describe this migration impact"}\n',
+			);
 		} finally {
 			await file.close();
 		}
@@ -331,13 +330,15 @@ async function main() {
 	if (command === "schema:write") {
 		await writeFile(generated.manifestPath, `${JSON.stringify({
 			...generated.manifest,
-			schemaVersion: generated.schema.version,
+			// 生产 schemaVersion 只能由平台固定 WASM/provider contract 生成。
+			schemaVersion: "platform",
 		}, null, 2)}\n`);
 	} else if (command !== "validate") {
 		throw new Error("usage: noumi-db-schema.ts <schema:write|validate|migration:new>");
 	}
 	if (
 		command === "validate" &&
+		generated.manifest.schemaVersion !== "platform" &&
 		generated.manifest.schemaVersion !== generated.schema.version
 	) {
 		throw new Error(`schemaVersion mismatch; run bun run db:schema:write`);

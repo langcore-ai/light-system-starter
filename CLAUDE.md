@@ -22,6 +22,8 @@ Build a standalone React application that runs entirely in the browser. Do not c
 - Use `window.NoumiBridge.db.from(table)` for normal shared CRUD. Check `result.ok` before reading data, and require a filter or explicit `.all()` for update/delete.
 - Use `window.NoumiBridge.db.sql` only when fluent CRUD cannot express the query, and first check `db.capabilities.sqlQuery` or `sqlExecute`. Capability flags describe provider availability, not user permission.
 - Do not execute DDL at runtime. `noumi.db.json` and append-only `db/migrations/*.sql` are applied only by the trusted publication state machine.
+- Keep the generated `-- noumi:migration-risk {...}` first line in every new migration. Use `data-change` for inserts and `destructive` for updates, deletes, rename/drop, constraint changes or public policy tightening; replace the summary with the actual data impact.
+- Keep `noumi.db.json.schemaVersion` as `platform`; the local CLI is a syntax preflight, while the publication service is the only schema-hash authority.
 - Treat a mutation transport error with `outcome: "unknown"` as possibly committed. Keep its operation ID and call `db.operations.get(operationId)`; do not construct a new mutation as a retry.
 - You may call explicit external HTTPS APIs. Their CORS policy must allow browser access.
 - Never call relative `/api/*` or the reserved `/.noumi/db/*` route directly. The SDK and trusted Bridge own authentication, version fences, request limits, and error validation.

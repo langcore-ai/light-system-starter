@@ -2,7 +2,7 @@
   "version": 1,
   "dialect": "sqlite",
   "migrationsDir": "db/migrations",
-  "schemaVersion": "sha256:f44b1e4950be9ad2157fcf69c6f65e2947d38c8421261f0633aa8ddc9bf9309f",
+  "schemaVersion": "platform",
   "tables": {
     "tasks": {
       "fluentReadable": true,
