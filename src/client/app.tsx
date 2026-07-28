@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
+import { AppStorageTestPanel } from "./app-storage-test-panel";
 import { DiagnosticsTestPanel } from "./diagnostics-test-panel";
 
 /** Starter migration 创建的共享任务行。 */
@@ -264,6 +265,7 @@ export function App() {
 					<code className="text-xs text-muted-foreground">{sqlSummary}</code>
 				</Card>
 
+				<AppStorageTestPanel />
 				<DiagnosticsTestPanel />
 			</div>
 		</main>

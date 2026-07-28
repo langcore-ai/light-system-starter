@@ -7,6 +7,11 @@ import {
 	NoumiClientDiagnosticsReporter,
 	type NoumiReportErrorOptions,
 } from "./noumi-client-diagnostics";
+import {
+	createNoumiAppStorage,
+	type NoumiAppStorageControlTransport,
+	type NoumiFileCapabilities,
+} from "./noumi-app-storage";
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
@@ -38,6 +43,7 @@ type BootstrapPayload = {
 	createByMember: BootstrapMember;
 	currentMember: BootstrapMember | null;
 	databaseCapabilities: NoumiDbCapabilities;
+	appStorageCapabilities: NoumiFileCapabilities;
 };
 
 /** 等待中的 Bridge RPC。 */
@@ -116,6 +122,18 @@ function isDatabaseCapabilities(value: unknown): value is NoumiDbCapabilities {
 		typeof value.sqlQuery === "boolean" &&
 		typeof value.sqlExecute === "boolean" &&
 		typeof value.operationRecovery === "boolean";
+}
+
+/** 校验 App Storage capability 快照；真实授权仍由 Gateway 逐请求复核。 */
+function isAppStorageCapabilities(
+	value: unknown,
+): value is NoumiFileCapabilities {
+	return isRecord(value) &&
+		value.protocolVersion === 1 &&
+		typeof value.read === "boolean" &&
+		typeof value.write === "boolean" &&
+		Number.isSafeInteger(value.maxFileBytes) &&
+		Number(value.maxFileBytes) > 0;
 }
 
 /** 校验父窗口返回的数据库 response。 */
@@ -205,7 +223,8 @@ addEventListener("message", (event) => {
 			typeof payload.app.name !== "string" ||
 			!isMember(payload.createByMember) ||
 			payload.currentMember !== null && !isMember(payload.currentMember) ||
-			!isDatabaseCapabilities(payload.databaseCapabilities)
+			!isDatabaseCapabilities(payload.databaseCapabilities) ||
+			!isAppStorageCapabilities(payload.appStorageCapabilities)
 		) {
 			bootstrapReject(new Error("Noumi iframe bootstrap payload is invalid"));
 			return;
@@ -251,6 +270,11 @@ function call(
 ): Promise<unknown> {
 	return new Promise((resolve, reject) => {
 		const requestId = `${Date.now().toString(36)}:${(++requestSequence).toString(36)}`;
+		const cancelMethod = method === "appStorage.request"
+			? "appStorage.cancel"
+			: method === "db.request"
+				? "db.cancel"
+				: null;
 		if (signal?.aborted) {
 			reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
 			return;
@@ -262,28 +286,32 @@ function call(
 			clearTimeout(active.timer);
 			reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
 			// 取消只表示停止等待；父窗口和服务端仍按 operation ID 收敛 mutation。
-			window.parent.postMessage({
-				type: BRIDGE_REQUEST_MESSAGE,
-				version: BRIDGE_VERSION,
-				channelId,
-				requestId: `${requestId}:cancel`,
-				method: "db.cancel",
-				params: { requestId },
-			}, "*");
+			if (cancelMethod) {
+				window.parent.postMessage({
+					type: BRIDGE_REQUEST_MESSAGE,
+					version: BRIDGE_VERSION,
+					channelId,
+					requestId: `${requestId}:cancel`,
+					method: cancelMethod,
+					params: { requestId },
+				}, "*");
+			}
 		};
 		const timer = setTimeout(() => {
 			pending.delete(requestId);
 			signal?.removeEventListener("abort", abort);
 			reject(new Error("Noumi capability call timed out"));
 			// Query 尽快释放 provider 资源；mutation 仍只把结果视为 unknown。
-			window.parent.postMessage({
-				type: BRIDGE_REQUEST_MESSAGE,
-				version: BRIDGE_VERSION,
-				channelId,
-				requestId: `${requestId}:timeout`,
-				method: "db.cancel",
-				params: { requestId },
-			}, "*");
+			if (cancelMethod) {
+				window.parent.postMessage({
+					type: BRIDGE_REQUEST_MESSAGE,
+					version: BRIDGE_VERSION,
+					channelId,
+					requestId: `${requestId}:timeout`,
+					method: cancelMethod,
+					params: { requestId },
+				}, "*");
+			}
 		}, BRIDGE_REQUEST_TIMEOUT_MS);
 		pending.set(requestId, {
 			resolve(value) {
@@ -325,6 +353,18 @@ const databaseTransport: NoumiDbTransport = async (request, options) => {
 	}, options?.signal);
 	if (!isBridgeDatabaseResponse(response)) {
 		throw new Error("Noumi database Bridge response is invalid");
+	}
+	return new Response(response.body, {
+		status: response.status,
+		headers: response.headers,
+	});
+};
+
+/** App Storage control JSON 通过可信父外壳；文件 bytes 由 SDK 直接走 ticket URL。 */
+const appStorageTransport: NoumiAppStorageControlTransport = async (request) => {
+	const response = await call("appStorage.request", request);
+	if (!isBridgeDatabaseResponse(response)) {
+		throw new Error("Noumi App Storage Bridge response is invalid");
 	}
 	return new Response(response.body, {
 		status: response.status,
@@ -378,7 +418,11 @@ const bridge = Object.freeze({
 				key: requireString(key, "key"),
 			}) === true;
 		},
-	}),
+		}),
+	appStorage: createNoumiAppStorage(
+		appStorageTransport,
+		payload.appStorageCapabilities,
+	),
 	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
 });
 

@@ -9,6 +9,21 @@ import type {
 	NoumiDbScalar as NoumiDbScalarSdk,
 	NoumiDbSuccess as NoumiDbSuccessSdk,
 } from "../../scripts/noumi-db-sdk";
+import type {
+	NoumiAppStorage as NoumiAppStorageSdk,
+	NoumiAppStorageCopyOptions as NoumiAppStorageCopyOptionsSdk,
+	NoumiAppStorageFile as NoumiAppStorageFileSdk,
+	NoumiAppStorageGetOptions as NoumiAppStorageGetOptionsSdk,
+	NoumiAppStorageListOptions as NoumiAppStorageListOptionsSdk,
+	NoumiAppStorageListPage as NoumiAppStorageListPageSdk,
+	NoumiAppStorageObject as NoumiAppStorageObjectSdk,
+	NoumiAppStoragePutOptions as NoumiAppStoragePutOptionsSdk,
+	NoumiFileCapabilities as NoumiFileCapabilitiesSdk,
+	NoumiFileDownloadUrl as NoumiFileDownloadUrlSdk,
+	NoumiFileDownloadUrlOptions as NoumiFileDownloadUrlOptionsSdk,
+	NoumiFileInput as NoumiFileInputSdk,
+	NoumiFileRange as NoumiFileRangeSdk,
+} from "../../scripts/noumi-app-storage";
 
 declare global {
 	/** Noumi DB 支持的标量。 */
@@ -29,6 +44,32 @@ declare global {
 	type NoumiDbResult<T> = NoumiDbResultSdk<T>;
 	/** 当前轻系统的共享数据库 SDK。 */
 	type NoumiDatabase = NoumiDatabaseSdk;
+	/** App Storage 支持的文件输入。 */
+	type NoumiFileInput = NoumiFileInputSdk;
+	/** App Storage 字节范围。 */
+	type NoumiFileRange = NoumiFileRangeSdk;
+	/** 当前成员可观测的文件能力。 */
+	type NoumiFileCapabilities = NoumiFileCapabilitiesSdk;
+	/** 短期文件下载 URL。 */
+	type NoumiFileDownloadUrl = NoumiFileDownloadUrlSdk;
+	/** 下载 URL 选项。 */
+	type NoumiFileDownloadUrlOptions = NoumiFileDownloadUrlOptionsSdk;
+	/** App Storage 对象 metadata。 */
+	type NoumiAppStorageObject = NoumiAppStorageObjectSdk;
+	/** 带 Blob 内容的 App Storage 文件。 */
+	type NoumiAppStorageFile = NoumiAppStorageFileSdk;
+	/** App Storage put 选项。 */
+	type NoumiAppStoragePutOptions = NoumiAppStoragePutOptionsSdk;
+	/** App Storage get 选项。 */
+	type NoumiAppStorageGetOptions = NoumiAppStorageGetOptionsSdk;
+	/** App Storage list 选项。 */
+	type NoumiAppStorageListOptions = NoumiAppStorageListOptionsSdk;
+	/** App Storage list 分页结果。 */
+	type NoumiAppStorageListPage = NoumiAppStorageListPageSdk;
+	/** App Storage copy 选项。 */
+	type NoumiAppStorageCopyOptions = NoumiAppStorageCopyOptionsSdk;
+	/** 当前轻系统独享的跨 deployment 对象存储。 */
+	type NoumiAppStorage = NoumiAppStorageSdk;
 
 	/** 轻系统可见的成员信息。 */
 	interface NoumiMember {
@@ -68,6 +109,8 @@ declare global {
 			/** 判断当前轻系统是否存在指定键。 */
 			has(key: string): Promise<boolean>;
 		};
+		/** 按不可变 LightSystem.id 隔离、跨 deployment 保留的对象存储。 */
+		readonly appStorage: NoumiAppStorage;
 		/** 当前轻系统独享 SQLite 的受控 fluent/SQL 数据 API。 */
 		db: NoumiDatabase;
 	}
