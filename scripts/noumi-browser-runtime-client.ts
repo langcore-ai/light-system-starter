@@ -192,7 +192,6 @@ const channelId = Array.from(
 	(value) => value.toString(36),
 ).join("-");
 const pending = new Map<string, PendingRequest>();
-let requestSequence = 0;
 let bootstrapResolve: (payload: BootstrapPayload) => void;
 let bootstrapReject: (reason: unknown) => void;
 let bootstrapTimer: ReturnType<typeof setTimeout>;
@@ -247,10 +246,12 @@ addEventListener("message", (event) => {
 	if (event.data.ok === true) active.resolve(event.data.result);
 	else {
 		active.reject(
-			new Error(
+			createBridgeCallError(
 				typeof event.data.error === "string"
 					? event.data.error
 					: "Noumi capability call failed",
+				event.data.requestId,
+				"unknown",
 			),
 		);
 	}
@@ -262,6 +263,28 @@ window.parent.postMessage({
 	channelId,
 }, "*");
 
+/** 创建带 request ID/outcome 的 Bridge transport error。 */
+function createBridgeCallError(
+	cause: unknown,
+	requestId: string,
+	outcome: "not-sent" | "unknown",
+): Error & {
+	requestId: string;
+	outcome: "not-sent" | "unknown";
+} {
+	const error = new Error(
+		cause instanceof Error ? cause.message : String(cause),
+		{ cause },
+	) as Error & {
+		requestId: string;
+		outcome: "not-sent" | "unknown";
+	};
+	error.name = "NoumiBridgeCallError";
+	error.requestId = requestId;
+	error.outcome = outcome;
+	return error;
+}
+
 /** 调用可信父窗口能力。 */
 function call(
 	method: string,
@@ -269,14 +292,19 @@ function call(
 	signal?: AbortSignal,
 ): Promise<unknown> {
 	return new Promise((resolve, reject) => {
-		const requestId = `${Date.now().toString(36)}:${(++requestSequence).toString(36)}`;
+		// UUID 避免同一 Light System 的多成员、多 tab 在同一毫秒产生碰撞。
+		const requestId = crypto.randomUUID();
 		const cancelMethod = method === "appStorage.request"
 			? "appStorage.cancel"
 			: method === "db.request"
 				? "db.cancel"
 				: null;
 		if (signal?.aborted) {
-			reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+			reject(createBridgeCallError(
+				signal.reason ?? new DOMException("Aborted", "AbortError"),
+				requestId,
+				"not-sent",
+			));
 			return;
 		}
 		const abort = () => {
@@ -284,7 +312,11 @@ function call(
 			if (!active) return;
 			pending.delete(requestId);
 			clearTimeout(active.timer);
-			reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
+			reject(createBridgeCallError(
+				signal?.reason ?? new DOMException("Aborted", "AbortError"),
+				requestId,
+				"unknown",
+			));
 			// 取消只表示停止等待；父窗口和服务端仍按 operation ID 收敛 mutation。
 			if (cancelMethod) {
 				window.parent.postMessage({
@@ -300,7 +332,11 @@ function call(
 		const timer = setTimeout(() => {
 			pending.delete(requestId);
 			signal?.removeEventListener("abort", abort);
-			reject(new Error("Noumi capability call timed out"));
+			reject(createBridgeCallError(
+				"Noumi capability call timed out",
+				requestId,
+				"unknown",
+			));
 			// Query 尽快释放 provider 资源；mutation 仍只把结果视为 unknown。
 			if (cancelMethod) {
 				window.parent.postMessage({
@@ -361,8 +397,11 @@ const databaseTransport: NoumiDbTransport = async (request, options) => {
 };
 
 /** App Storage control JSON 通过可信父外壳；文件 bytes 由 SDK 直接走 ticket URL。 */
-const appStorageTransport: NoumiAppStorageControlTransport = async (request) => {
-	const response = await call("appStorage.request", request);
+const appStorageTransport: NoumiAppStorageControlTransport = async (
+	request,
+	options,
+) => {
+	const response = await call("appStorage.request", request, options?.signal);
 	if (!isBridgeDatabaseResponse(response)) {
 		throw new Error("Noumi App Storage Bridge response is invalid");
 	}

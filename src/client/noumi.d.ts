@@ -18,11 +18,13 @@ import type {
 	NoumiAppStorageListPage as NoumiAppStorageListPageSdk,
 	NoumiAppStorageObject as NoumiAppStorageObjectSdk,
 	NoumiAppStoragePutOptions as NoumiAppStoragePutOptionsSdk,
+	NoumiAppStorageRequestOptions as NoumiAppStorageRequestOptionsSdk,
 	NoumiFileCapabilities as NoumiFileCapabilitiesSdk,
 	NoumiFileDownloadUrl as NoumiFileDownloadUrlSdk,
 	NoumiFileDownloadUrlOptions as NoumiFileDownloadUrlOptionsSdk,
 	NoumiFileInput as NoumiFileInputSdk,
 	NoumiFileRange as NoumiFileRangeSdk,
+	NoumiFileTransportError as NoumiFileTransportErrorSdk,
 } from "../../scripts/noumi-app-storage";
 
 declare global {
@@ -68,6 +70,10 @@ declare global {
 	type NoumiAppStorageListPage = NoumiAppStorageListPageSdk;
 	/** App Storage copy 选项。 */
 	type NoumiAppStorageCopyOptions = NoumiAppStorageCopyOptionsSdk;
+	/** 只承载 AbortSignal 的 App Storage 通用选项。 */
+	type NoumiAppStorageRequestOptions = NoumiAppStorageRequestOptionsSdk;
+	/** Bridge、网络或响应协议失败。 */
+	type NoumiFileTransportError = NoumiFileTransportErrorSdk;
 	/** 当前轻系统独享的跨 deployment 对象存储。 */
 	type NoumiAppStorage = NoumiAppStorageSdk;
 
