@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and a deterministic build that writes `dist/index.html`. It has no app-owned server entrypoint, runtime process, Worker binding, database handle, or platform credential. Shared server-side data is available only through the platform-injected `window.NoumiBridge.db` capability.
+This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and a deterministic build that writes `dist/index.html`. It has no app-owned server entrypoint, runtime process, Worker binding, database handle, or platform credential. Platform-owned shared data is available through `window.NoumiBridge.db`; a current Project member can separately authorize one of their private external PostgreSQL connections through `window.NoumiBridge.outsideDb`.
 
 ## Structure
 
@@ -13,6 +13,7 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`; the independently minified Browser Runtime and business bundle run in sequential isolated scopes so their short identifiers cannot collide.
 - `scripts/noumi-db-sdk.ts`: browser-only fluent/controlled-SQL SDK that produces virtual v1 Requests.
 - `scripts/noumi-db-schema.ts`: local migration replay, registry/hash generation and validation CLI.
+- `scripts/noumi-outside-db.ts`: browser-only SDK for user-private external PostgreSQL; it validates slugs, bindings, limits, result envelopes and cancellation without exposing credentials or internal authority.
 - `scripts/noumi-browser-runtime-client.ts`: validates the parent Bridge bootstrap and injects `window.NoumiBridge`.
 - `scripts/verify-static.ts`: parses and verifies the final inline browser module instead of checking only marker strings.
 - `noumi.db.json` and `db/migrations/*.sql`: shared database policy and append-only schema history.
@@ -35,15 +36,17 @@ Commit source changes only, call `light_systems_artifacts_sync`, then call `ligh
 - The trusted shell injects `window.NoumiBridge` before the application bundle runs. It exposes the app name, creator, current signed-in member, asynchronous app-scoped `localStorage`, and the current Light System's controlled database SDK.
 - `NoumiBridge.localStorage` is backed by the trusted shell's dedicated IndexedDB database and partitioned by Light System ID. It never reads, writes, or clears the main frontend's `window.localStorage`.
 - `NoumiBridge.db.from(table)` provides schema-checked CRUD. `db.sql.query/execute` remain present for complex queries, but generated code must check `db.capabilities.sqlQuery/sqlExecute` because a provider can fail closed until its SQL safety gate passes.
+- `NoumiBridge.outsideDb(slug).sql(sql, bindings, options)` executes native PostgreSQL through a current-user, current-deployment grant. Check `outsideDb.capabilities.available`, keep values in bindings, and handle both `{ ok: false }` results and thrown transport errors. A call uses one physical connection, so transactions must fit inside one call; timeout, abort or transport failure can leave a write outcome unknown and must not trigger an automatic retry.
+- External PostgreSQL is independent from `NoumiBridge.db`: it has no `noumi.db.json` or Light System migration. Source contains only the approved slug and SQL, never a connection URL, password, connection/grant ID, Project/user/Light-System ID or Executor address. Republishing invalidates the previous deployment grant.
 - Create a migration with `bun run db:migration:new -- <snake_case_slug>`, replace the generated first-line `noumi:migration-risk` summary/level with the real impact, then run `bun run db:schema:write`. Existing migration files are append-only and must never be edited after publication.
 - The platform has no lifetime migration-count or byte cap. Each migration stays under 256 KiB and one publication's pending SQL under 1 MiB; an 8 MiB bootstrap guard applies only to the first publication before a trusted checkpoint exists. The local CLI does not pretend to know whether that checkpoint exists. DML, rename/drop, constraint changes and public policy tightening produce a user-confirmed impact preview.
 - The local schema CLI is only an authoring preflight and writes the `platform` schemaVersion sentinel. Publication independently computes the authoritative hash, replays and authorizes the exact migration source inside the dedicated DO, and then stores a trusted physical checkpoint.
 - Database calls are shared server persistence and require a signed-in Project member on every request. PUBLIC/password access only loads static UI; capability flags are not permission grants.
 - Database mutation builders require a filter or explicit `.all()`, use operation IDs for idempotency, and return `NoumiDbResult` envelopes for HTTP/data errors. Transport failure after a mutation is an unknown outcome; recover it through `db.operations.get(operationId)`.
 - Browser-local storage is capped at 4 KiB per key, 1 MiB per value, and 5 MiB per Light System.
-- Relative `/api/*` is not a Light System backend and must not be used; only the injected database SDK may call the reserved platform data route.
+- Relative `/api/*` is not a Light System backend and must not be used; only the injected SDKs may call their reserved platform data routes.
 - Direct requests to external APIs are allowed, but browser CORS rules determine whether JavaScript may read the response.
-- Native browser persistence APIs remain unavailable in the opaque-origin iframe. Use `window.NoumiBridge.localStorage` for small device-local state and `window.NoumiBridge.db` for authorized shared persistence; their scopes are independent.
+- Native browser persistence APIs remain unavailable in the opaque-origin iframe. Use `window.NoumiBridge.localStorage` for small device-local state, `window.NoumiBridge.db` for platform-owned shared persistence, and `window.NoumiBridge.outsideDb` only for an explicitly authorized user-owned PostgreSQL connection; all scopes are independent.
 - Keep the output self-contained. Same-app JS/CSS/image assets should be bundled or inlined by the build.
 
 ## Contract

@@ -44,6 +44,22 @@ import type {
 	NoumiWorkspaceTextReadOptions as NoumiWorkspaceTextReadOptionsSdk,
 	NoumiWorkspaceWriteOptions as NoumiWorkspaceWriteOptionsSdk,
 } from "../../scripts/noumi-workspace-files";
+import type {
+	NoumiOutsideDatabase as NoumiOutsideDatabaseSdk,
+	NoumiOutsideDbCapabilities as NoumiOutsideDbCapabilitiesSdk,
+	NoumiOutsideDbFactory as NoumiOutsideDbFactorySdk,
+	NoumiOutsideDbFailure as NoumiOutsideDbFailureSdk,
+	NoumiOutsideDbInputValue as NoumiOutsideDbInputValueSdk,
+	NoumiOutsideDbJson as NoumiOutsideDbJsonSdk,
+	NoumiOutsideDbResult as NoumiOutsideDbResultSdk,
+	NoumiOutsideDbRow as NoumiOutsideDbRowSdk,
+	NoumiOutsideDbSqlOptions as NoumiOutsideDbSqlOptionsSdk,
+	NoumiOutsideDbStatementResult as NoumiOutsideDbStatementResultSdk,
+	NoumiOutsideDbSuccess as NoumiOutsideDbSuccessSdk,
+	NoumiOutsideDbTaggedValue as NoumiOutsideDbTaggedValueSdk,
+	NoumiOutsideDbTransportError as NoumiOutsideDbTransportErrorSdk,
+	NoumiOutsideDbValue as NoumiOutsideDbValueSdk,
+} from "../../scripts/noumi-outside-db";
 
 declare global {
 	/** Noumi DB 支持的标量。 */
@@ -128,6 +144,43 @@ declare global {
 	type NoumiWorkspaceRequestOptions = NoumiWorkspaceRequestOptionsSdk;
 	/** 当前轻系统所属 Project 的 Workspace 文件 SDK。 */
 	type NoumiWorkspaceFiles = NoumiWorkspaceFilesSdk;
+	/** 外部数据库可用性快照。 */
+	type NoumiOutsideDbCapabilities = NoumiOutsideDbCapabilitiesSdk;
+	/** 外部数据库稳定 JSON 值。 */
+	type NoumiOutsideDbJson = NoumiOutsideDbJsonSdk;
+	/** 外部数据库 tagged wire 值。 */
+	type NoumiOutsideDbTaggedValue = NoumiOutsideDbTaggedValueSdk;
+	/** `.sql()` 可接受的 binding。 */
+	type NoumiOutsideDbInputValue = NoumiOutsideDbInputValueSdk;
+	/** 外部数据库结果值。 */
+	type NoumiOutsideDbValue = NoumiOutsideDbValueSdk;
+	/** 默认外部数据库行。 */
+	type NoumiOutsideDbRow = NoumiOutsideDbRowSdk;
+	/** 单条 statement 结果。 */
+	type NoumiOutsideDbStatementResult<
+		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
+	> =
+		NoumiOutsideDbStatementResultSdk<T>;
+	/** 外部数据库 SQL 选项。 */
+	type NoumiOutsideDbSqlOptions = NoumiOutsideDbSqlOptionsSdk;
+	/** 外部数据库成功结果。 */
+	type NoumiOutsideDbSuccess<
+		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
+	> =
+		NoumiOutsideDbSuccessSdk<T>;
+	/** 外部数据库失败结果。 */
+	type NoumiOutsideDbFailure = NoumiOutsideDbFailureSdk;
+	/** 外部数据库可判别结果。 */
+	type NoumiOutsideDbResult<
+		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
+	> =
+		NoumiOutsideDbResultSdk<T>;
+	/** 一条用户私有外部数据库引用。 */
+	type NoumiOutsideDatabase = NoumiOutsideDatabaseSdk;
+	/** 外部数据库 callable factory。 */
+	type NoumiOutsideDbFactory = NoumiOutsideDbFactorySdk;
+	/** Bridge/网络/协议 transport 故障。 */
+	type NoumiOutsideDbTransportError = NoumiOutsideDbTransportErrorSdk;
 
 	/** 轻系统可见的成员信息。 */
 	interface NoumiMember {
@@ -171,6 +224,8 @@ declare global {
 		readonly appStorage: NoumiAppStorage;
 		/** 代表当前成员操作当前轻系统所属 Project 的 Workspace 文件。 */
 		readonly workspaceFiles: NoumiWorkspaceFiles;
+		/** 按当前 Project、当前用户和 slug 解析的用户私有外部数据库。 */
+		readonly outsideDb: NoumiOutsideDbFactory;
 		/** 当前轻系统独享 SQLite 的受控 fluent/SQL 数据 API。 */
 		db: NoumiDatabase;
 	}

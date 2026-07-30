@@ -6,6 +6,7 @@
 	},
 	"include": [
 		"scripts/noumi-browser-runtime-client.ts",
+		"scripts/noumi-outside-db.ts",
 		"scripts/noumi-db-sdk.ts",
 		"scripts/noumi-db-sdk.typecheck.ts",
 		"src/client/**/*.tsx",

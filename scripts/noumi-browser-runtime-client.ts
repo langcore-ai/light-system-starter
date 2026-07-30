@@ -16,6 +16,11 @@ import {
 	createNoumiWorkspaceFiles,
 	type NoumiWorkspaceFilesControlTransport,
 } from "./noumi-workspace-files";
+import {
+	createNoumiOutsideDb,
+	type NoumiOutsideDbCapabilities,
+	type NoumiOutsideDbTransport,
+} from "./noumi-outside-db";
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
@@ -48,6 +53,7 @@ type BootstrapPayload = {
 	currentMember: BootstrapMember | null;
 	databaseCapabilities: NoumiDbCapabilities;
 	appStorageCapabilities: NoumiFileCapabilities;
+	outsideDbCapabilities: NoumiOutsideDbCapabilities;
 	workspaceFilesCapabilities: NoumiFileCapabilities;
 };
 
@@ -141,6 +147,16 @@ function isAppStorageCapabilities(
 		Number(value.maxFileBytes) > 0;
 }
 
+/** 校验外部数据库 capability 快照；grant 不会通过 bootstrap 暴露。 */
+function isOutsideDbCapabilities(
+	value: unknown,
+): value is NoumiOutsideDbCapabilities {
+	return isRecord(value) &&
+		value.protocolVersion === 1 &&
+		typeof value.available === "boolean" &&
+		value.driver === "POSTGRESQL";
+}
+
 /** 校验父窗口返回的数据库 response。 */
 function isBridgeDatabaseResponse(value: unknown): value is BridgeDatabaseResponse {
 	if (
@@ -229,6 +245,7 @@ addEventListener("message", (event) => {
 			payload.currentMember !== null && !isMember(payload.currentMember) ||
 			!isDatabaseCapabilities(payload.databaseCapabilities) ||
 			!isAppStorageCapabilities(payload.appStorageCapabilities) ||
+			!isOutsideDbCapabilities(payload.outsideDbCapabilities) ||
 			!isAppStorageCapabilities(payload.workspaceFilesCapabilities)
 		) {
 			bootstrapReject(new Error("Noumi iframe bootstrap payload is invalid"));
@@ -296,6 +313,7 @@ function call(
 	method: string,
 	params: unknown,
 	signal?: AbortSignal,
+	timeoutMs = BRIDGE_REQUEST_TIMEOUT_MS,
 ): Promise<unknown> {
 	return new Promise((resolve, reject) => {
 		// UUID 避免同一 Light System 的多成员、多 tab 在同一毫秒产生碰撞。
@@ -304,9 +322,11 @@ function call(
 			? "appStorage.cancel"
 			: method === "workspaceFiles.request"
 				? "workspaceFiles.cancel"
-			: method === "db.request"
-				? "db.cancel"
-				: null;
+				: method === "outsideDb.request"
+					? "outsideDb.cancel"
+					: method === "db.request"
+						? "db.cancel"
+						: null;
 		if (signal?.aborted) {
 			reject(createBridgeCallError(
 				signal.reason ?? new DOMException("Aborted", "AbortError"),
@@ -331,7 +351,7 @@ function call(
 					type: BRIDGE_REQUEST_MESSAGE,
 					version: BRIDGE_VERSION,
 					channelId,
-					requestId: `${requestId}:cancel`,
+					requestId: crypto.randomUUID(),
 					method: cancelMethod,
 					params: { requestId },
 				}, "*");
@@ -351,12 +371,12 @@ function call(
 					type: BRIDGE_REQUEST_MESSAGE,
 					version: BRIDGE_VERSION,
 					channelId,
-					requestId: `${requestId}:timeout`,
+					requestId: crypto.randomUUID(),
 					method: cancelMethod,
 					params: { requestId },
 				}, "*");
 			}
-		}, BRIDGE_REQUEST_TIMEOUT_MS);
+		}, timeoutMs);
 		pending.set(requestId, {
 			resolve(value) {
 				signal?.removeEventListener("abort", abort);
@@ -438,6 +458,23 @@ const workspaceFilesTransport: NoumiWorkspaceFilesControlTransport = async (
 	});
 };
 
+/** 完整 SQL 只经可信父外壳发送；iframe 不接触连接或 Executor 信息。 */
+const outsideDbTransport: NoumiOutsideDbTransport = async (
+	request,
+	options,
+) => {
+	const response = await call(
+		"outsideDb.request",
+		request,
+		options?.signal,
+		Math.min((options?.timeoutMs ?? 15_000) + 5_000, 65_000),
+	);
+	if (!isBridgeDatabaseResponse(response)) {
+		throw new Error("Noumi external database Bridge response is invalid");
+	}
+	return response;
+};
+
 const payload = await bootstrap;
 const bridge = Object.freeze({
 	app: Object.freeze({ name: payload.app.name }),
@@ -484,7 +521,7 @@ const bridge = Object.freeze({
 				key: requireString(key, "key"),
 			}) === true;
 		},
-		}),
+	}),
 	appStorage: createNoumiAppStorage(
 		appStorageTransport,
 		payload.appStorageCapabilities,
@@ -492,6 +529,10 @@ const bridge = Object.freeze({
 	workspaceFiles: createNoumiWorkspaceFiles(
 		workspaceFilesTransport,
 		payload.workspaceFilesCapabilities,
+	),
+	outsideDb: createNoumiOutsideDb(
+		outsideDbTransport,
+		payload.outsideDbCapabilities,
 	),
 	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
 });
