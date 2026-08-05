@@ -7,9 +7,8 @@
 		"skipLibCheck": true,
 		"strict": true,
 		"target": "ES2022",
-		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/client/*"]
+			"@/*": ["./src/client/*"]
 		}
 	}
 }

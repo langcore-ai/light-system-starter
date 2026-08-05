@@ -115,9 +115,9 @@ async function main() {
 			emptyOutDir: false,
 			minify: true,
 			sourcemap: true,
-			rollupOptions: {
+			rolldownOptions: {
 				input: CLIENT_ENTRY_PATH,
-				output: { format: "es", inlineDynamicImports: true },
+				output: { format: "es", codeSplitting: false },
 			},
 			write: false,
 		},

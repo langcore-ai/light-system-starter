@@ -53,9 +53,9 @@ export async function createNoumiBrowserRuntimeBuild(): Promise<NoumiBrowserRunt
 			emptyOutDir: false,
 			minify: true,
 			sourcemap: true,
-			rollupOptions: {
+			rolldownOptions: {
 				input: BROWSER_RUNTIME_ENTRY_PATH,
-				output: { format: "es", inlineDynamicImports: true },
+				output: { format: "es", codeSplitting: false },
 			},
 			target: "es2022",
 			write: false,
