@@ -43,7 +43,7 @@ async function main() {
 	const inlineModule = index.match(
 		/<script type="module">([\s\S]*?)<\/script>/i,
 	)?.[1];
-	assert(inlineModule, "inline browser module is missing");
+	assert(typeof inlineModule === "string", "inline browser module is missing");
 	// 两段独立压缩的 bundle 即使都能单独解析，直接拼接后仍可能变量重名。
 	await transformWithOxc(inlineModule, "index.js", {
 		lang: "js",

@@ -74,7 +74,7 @@ type BridgeDatabaseResponse = {
 /** 页面级错误探针在业务 bundle 之前安装，bootstrap 前错误先进入有界队列。 */
 const diagnosticsReporter = new NoumiClientDiagnosticsReporter();
 
-addEventListener("error", (event) => {
+window.addEventListener("error", (event) => {
 	// 资源 error 不冒泡，必须使用捕获阶段；监听器只观察，不调用 preventDefault。
 	if (event.target && event.target !== window) {
 		diagnosticsReporter.captureResourceError(event.target as {
@@ -94,12 +94,12 @@ addEventListener("error", (event) => {
 	});
 }, true);
 
-addEventListener("unhandledrejection", (event) => {
+window.addEventListener("unhandledrejection", (event) => {
 	// 不取消浏览器默认行为，原始 rejection 仍显示在 DevTools。
 	diagnosticsReporter.captureUnhandledRejection(event.reason);
 });
 
-addEventListener("pagehide", () => {
+window.addEventListener("pagehide", () => {
 	// pagehide 只尝试同步 postMessage，HTTPS transport 由可信父外壳 best-effort 完成。
 	diagnosticsReporter.flush();
 });

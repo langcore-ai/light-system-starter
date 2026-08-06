@@ -61,8 +61,11 @@ export async function createNoumiBrowserRuntimeBuild(): Promise<NoumiBrowserRunt
 			write: false,
 		},
 	});
-	const outputs = (Array.isArray(result) ? result[0].output : result.output) as
-		| RuntimeOutputAsset[];
+	const buildResult = Array.isArray(result) ? result[0] : result;
+	if (!buildResult || !("output" in buildResult)) {
+		throw new Error("Browser Runtime build unexpectedly entered watch mode");
+	}
+	const outputs = buildResult.output as RuntimeOutputAsset[];
 	const output = outputs.find((candidate) => candidate.fileName.endsWith(".js"));
 	if (!output?.code) throw new Error("Browser Runtime did not emit JavaScript");
 	return {

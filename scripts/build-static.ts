@@ -122,7 +122,11 @@ async function main() {
 			write: false,
 		},
 	});
-	const outputs = (Array.isArray(result) ? result[0].output : result.output) as OutputAsset[];
+	const buildResult = Array.isArray(result) ? result[0] : result;
+	if (!buildResult || !("output" in buildResult)) {
+		throw new Error("client build unexpectedly entered watch mode");
+	}
+	const outputs = buildResult.output as OutputAsset[];
 	const javascriptOutput = outputs.find((output) =>
 		output.fileName.endsWith(".js")
 	);
