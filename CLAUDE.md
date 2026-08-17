@@ -2,7 +2,7 @@
 
 ## Product model
 
-Build a standalone React application that runs entirely in the browser. Do not create app-owned server routes, Durable Objects, Node/Bun services, SQLite files, or calls to the Neo Noumi main API. Use the platform-injected `window.NoumiBridge.db` for platform-owned shared persistence. Use `window.NoumiBridge.outsideDb` only when the user wants their existing private PostgreSQL connection and has approved its slug and current-deployment grant. Neither capability exposes a database handle, credentials or provider.
+Build a standalone React application that runs entirely in the browser. Do not create app-owned server routes, Durable Objects, Node/Bun services, SQLite files, or calls to the Neo Noumi main API. Choose among the platform-injected `window.NoumiBridge.localStorage`, `appStorage`, `workspaceFiles`, `db`, and `outsideDb` according to the data boundary below. None exposes credentials, provider handles, or main-site authority.
 
 ## Required workflow
 
@@ -19,6 +19,8 @@ Build a standalone React application that runs entirely in the browser. Do not c
 - The document runs in an opaque-origin iframe: scripts work, but native `localStorage`, `sessionStorage`, IndexedDB, cookies, Service Workers, and main-site ambient authority are unavailable.
 - The platform initializes `window.NoumiBridge` before the business bundle runs. Use its read-only `app`, `createByMember`, and `currentMember` context instead of inventing identity state.
 - Use the asynchronous `window.NoumiBridge.localStorage` API for small browser-local state. It is partitioned by Light System ID, isolated from the main frontend's localStorage, and capped at 5 MiB per Light System; it is not a shared database.
+- Use `window.NoumiBridge.appStorage` for app-owned uploads, attachments, and generated files that must survive deployments. It is isolated by immutable Light System ID and currently allows 32 MiB per file, 1 GiB total, and 10,000 objects per Light System.
+- Use `window.NoumiBridge.workspaceFiles` only when the file belongs in the current Project's collaborative Workspace. It is not private app storage. Check capability flags for UI availability, but rely on each request's authorization result.
 - Use `window.NoumiBridge.db.from(table)` for normal shared CRUD. Check `result.ok` before reading data, and require a filter or explicit `.all()` for update/delete.
 - Use `window.NoumiBridge.db.sql` only when fluent CRUD cannot express the query, and first check `db.capabilities.sqlQuery` or `sqlExecute`. Capability flags describe provider availability, not user permission.
 - Use `window.NoumiBridge.outsideDb(slug).sql(sql, bindings, options)` for native PostgreSQL only. Check `outsideDb.capabilities.available`, use bindings instead of interpolation, inspect the `{ ok: true | false }` envelope, and separately catch transport errors.
@@ -32,6 +34,17 @@ Build a standalone React application that runs entirely in the browser. Do not c
 - Never call relative `/api/*`, `/.noumi/db/*` or `/.noumi/outside-db/*` directly. The SDK and trusted Bridge own authentication, deployment/grant fences, request limits, cancellation and error validation.
 - Never request or embed main-site tokens, cookies, project IDs as authorization, database URLs, or object-storage credentials.
 - Bundle or inline same-app JS, CSS, fonts, and images so `index.html` remains self-contained.
+
+## Foreground long-running work
+
+- Treat multi-page document processing, batch import/conversion, and any work likely to outlive one page visit as an interruptible job, not one monolithic Promise.
+- Require a signed-in Project member for shared durable jobs. Persist the input file before processing: keep app-owned files in `appStorage` or collaborative files in `workspaceFiles`, and keep only their stable path, etag, and metadata in `db`. A browser `File` object alone cannot survive reload; if upload is refused or over quota, disclose that resumption requires reselecting and verifying the same file.
+- Create a database job before processing. Store its input etag, algorithm/rule version, total units, status, completed count, recent activity, and displayable error summary.
+- Split work into stable units such as PDF page numbers. Persist each unit result or file reference immediately and advance progress only after that write succeeds. Enforce a unique `(job_id, unit_key)` key; if progress cannot be updated atomically with the result, derive progress from persisted unit rows.
+- On reload, list incomplete jobs and offer Continue. Revalidate the input etag and algorithm version, skip persisted units, and retry only failed or missing units. Use a short database-time lease/conditional claim plus the unique unit key to prevent two tabs from corrupting the same job.
+- Do not rely on `beforeunload`, `pagehide`, or `visibilitychange` to save the only checkpoint. They are best effort. Stop scheduling work when the page is not foregrounded and never promise execution after close, refresh, sleep, or browser termination.
+- While running, show durable progress, current unit, failures, pause/continue/cancel controls, and a clear “keep this page in the foreground” notice. Warn on navigation when possible, but recovery must still work when no warning runs.
+- Use a Web Worker or yield between units for CPU-heavy parsing, process bounded data at a time, and release page/Blob/canvas resources. Workers improve responsiveness but do not make work durable after the page closes.
 
 ## Frontend rules
 
@@ -47,4 +60,5 @@ Build a standalone React application that runs entirely in the browser. Do not c
 - `bun run build` passes.
 - The generated `dist/index.html` contains no app-owned backend/runtime code.
 - The page works without `/api/*`.
+- Long-running workflows survive a forced interruption: reopening shows the incomplete job and resumes from persisted successful units without duplicate results.
 - Only source/configuration files are committed before sync and deployment.

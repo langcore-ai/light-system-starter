@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and a deterministic build that writes `dist/index.html`. It has no app-owned server entrypoint, runtime process, Worker binding, database handle, or platform credential. Platform-owned shared data is available through `window.NoumiBridge.db`; a current Project member can separately authorize one of their private external PostgreSQL connections through `window.NoumiBridge.outsideDb`.
+This repository is a pure frontend starter for AI-generated Light Systems. It owns browser source and a deterministic build that writes `dist/index.html`. It has no app-owned server entrypoint, runtime process, Worker binding, database handle, or platform credential. The trusted `window.NoumiBridge` separates browser-local state, app-owned files, Project Workspace files, platform-owned SQLite data, and user-authorized external PostgreSQL.
 
 ## Structure
 
@@ -13,7 +13,9 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`; the independently minified Browser Runtime and business bundle run in sequential isolated scopes so their short identifiers cannot collide.
 - `scripts/noumi-db-sdk.ts`: browser-only fluent/controlled-SQL SDK that produces virtual v1 Requests.
 - `scripts/noumi-db-schema.ts`: local migration replay, registry/hash generation and validation CLI.
+- `scripts/noumi-app-storage.ts`: browser-only SDK for Light-System-owned files that survive deployments.
 - `scripts/noumi-outside-db.ts`: browser-only SDK for user-private external PostgreSQL; it validates slugs, bindings, limits, result envelopes and cancellation without exposing credentials or internal authority.
+- `scripts/noumi-workspace-files.ts`: browser-only SDK for files that belong in the current Project's collaborative Workspace.
 - `scripts/noumi-browser-runtime-client.ts`: validates the parent Bridge bootstrap and injects `window.NoumiBridge`.
 - `scripts/verify-static.ts`: parses and verifies the final inline browser module instead of checking only marker strings.
 - `noumi.db.json` and `db/migrations/*.sql`: shared database policy and append-only schema history.
@@ -33,8 +35,10 @@ Commit source changes only, call `light_systems_artifacts_sync`, then call `ligh
 
 - Generated code runs in an iframe with `sandbox="allow-scripts"` and without `allow-same-origin`.
 - The platform does not inject a bearer, database handle, generic main-site fetch wrapper, cookies, secrets, or provider binding.
-- The trusted shell injects `window.NoumiBridge` before the application bundle runs. It exposes the app name, creator, current signed-in member, asynchronous app-scoped `localStorage`, and the current Light System's controlled database SDK.
+- The trusted shell injects `window.NoumiBridge` before the application bundle runs. It exposes the app name, creator, current signed-in member, asynchronous app-scoped `localStorage`, `appStorage`, `workspaceFiles`, and controlled database SDKs.
 - `NoumiBridge.localStorage` is backed by the trusted shell's dedicated IndexedDB database and partitioned by Light System ID. It never reads, writes, or clears the main frontend's `window.localStorage`.
+- `NoumiBridge.appStorage` owns app-private uploads, attachments, and generated files. It is partitioned by immutable Light System ID, survives deployments, and currently allows 32 MiB per file, 1 GiB total, and 10,000 objects.
+- `NoumiBridge.workspaceFiles` reads and mutates the current Project's collaborative file tree on behalf of the current member. It is not an app-private bucket; capability flags are only UI availability hints and every request is authorized independently.
 - `NoumiBridge.db.from(table)` provides schema-checked CRUD. `db.sql.query/execute` remain present for complex queries, but generated code must check `db.capabilities.sqlQuery/sqlExecute` because a provider can fail closed until its SQL safety gate passes.
 - `NoumiBridge.outsideDb(slug).sql(sql, bindings, options)` executes native PostgreSQL through a current-user, current-deployment grant. Check `outsideDb.capabilities.available`, keep values in bindings, and handle both `{ ok: false }` results and thrown transport errors. A call uses one physical connection, so transactions must fit inside one call; timeout, abort or transport failure can leave a write outcome unknown and must not trigger an automatic retry.
 - External PostgreSQL is independent from `NoumiBridge.db`: it has no `noumi.db.json` or Light System migration. Source contains only the approved slug and SQL, never a connection URL, password, connection/grant ID, Project/user/Light-System ID or Executor address. Republishing invalidates the previous deployment grant.
@@ -46,8 +50,20 @@ Commit source changes only, call `light_systems_artifacts_sync`, then call `ligh
 - Browser-local storage is capped at 4 KiB per key, 1 MiB per value, and 5 MiB per Light System.
 - Relative `/api/*` is not a Light System backend and must not be used; only the injected SDKs may call their reserved platform data routes.
 - Direct requests to external APIs are allowed, but browser CORS rules determine whether JavaScript may read the response.
-- Native browser persistence APIs remain unavailable in the opaque-origin iframe. Use `window.NoumiBridge.localStorage` for small device-local state, `window.NoumiBridge.db` for platform-owned shared persistence, and `window.NoumiBridge.outsideDb` only for an explicitly authorized user-owned PostgreSQL connection; all scopes are independent.
+- Native browser persistence APIs remain unavailable in the opaque-origin iframe. Use `window.NoumiBridge.localStorage` for small device-local state, `window.NoumiBridge.appStorage` for app-owned files, `window.NoumiBridge.workspaceFiles` for Project files, `window.NoumiBridge.db` for platform-owned structured persistence, and `window.NoumiBridge.outsideDb` only for an explicitly authorized user-owned PostgreSQL connection; all scopes are independent.
 - Keep the output self-contained. Same-app JS/CSS/image assets should be bundled or inlined by the build.
+
+## Foreground jobs
+
+The browser is the only execution runtime, so long-running work cannot continue after close, refresh, process termination, or device sleep. Multi-page documents and batch operations must therefore use durable, resumable units:
+
+- Require a signed-in Project member for a shared durable job. Persist the source file first, then create a shared database job containing its stable path/etag and the processing-rule version. A browser `File` object alone is not resumable; if persistence is refused or over quota, continuing requires the user to reselect and verify the same file.
+- Give every unit a stable key and persist each successful result immediately. The unit-result rows, protected by a unique job/unit key, are the recovery source of truth; an in-memory percentage is not.
+- On entry, surface incomplete jobs and let the user continue after revalidating the source etag and rule version. A short lease evaluated with database time prevents competing tabs, while idempotent unit writes preserve correctness after lease races.
+- Only schedule new work while the page is visible. `visibilitychange`, `pagehide`, `beforeunload`, and navigation warnings are best effort and must never own the only checkpoint.
+- Keep the UI responsive with bounded per-unit memory and workers/yields where useful. Always show durable progress, current work, recoverable errors, pause/continue/cancel actions, and a notice that the page must remain in the foreground.
+
+For PDF parsing, store the PDF in the appropriate file capability and one database result per page. Resume by processing missing or failed page keys; never restart solely because the previous browser session disappeared.
 
 ## Contract
 
