@@ -10,6 +10,7 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `src/client/app.tsx`: page state and product UI.
 - `src/client/components/ui/*`: local component primitives.
 - `src/client/noumi.d.ts`: the single, self-contained public `window.NoumiBridge` type contract. It must not import or re-export types from `scripts/`; AI and editors must be able to understand the complete API from this file alone. Keep it compact by documenting only non-obvious public semantics, reusing existing named structures, and omitting the redundant `Noumi` prefix from declaration names; the runtime property remains `window.NoumiBridge`.
+- `.noumi/contract.json`: the installed interface-contract version and exact digest of platform-owned contract files. It is updated by the Static Light Systems Skill interface updater, not by ordinary app edits.
 - `src/client/styles.css`: Tailwind CSS v4 entry and semantic tokens.
 - `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`; the independently minified Browser Runtime and business bundle run in sequential isolated scopes so their short identifiers cannot collide.
 - `scripts/noumi-db-sdk.ts`: browser-only fluent/controlled-SQL SDK that produces virtual v1 Requests.
@@ -69,4 +70,4 @@ For PDF parsing, store the PDF in the appropriate file capability and one databa
 
 ## Contract
 
-The source repository must remain valid with `bun run db:validate` and buildable with `bun run build`; it must not commit `dist/` or a SQLite file. `src/client/noumi.d.ts` must remain one self-contained declaration file with no imports, while `bun run typecheck` proves that its public structures still match the split Runtime SDK implementations. The build must emit `dist/index.html`; the starter intentionally keeps it self-contained. The platform validates static output and database migrations from the exact same source commit before promoting the deployment.
+The source repository must remain valid with `bun run db:validate` and buildable with `bun run build`; it must not commit `dist/` or a SQLite file. `src/client/noumi.d.ts` must remain one self-contained declaration file with no imports, while `bun run typecheck` proves that its public structures still match the split Runtime SDK implementations. `.noumi/contract.json` must match the installed platform-owned files. The build must emit `dist/index.html`; the starter intentionally keeps it self-contained. The platform validates static output and database migrations from the exact same source commit before promoting the deployment.
