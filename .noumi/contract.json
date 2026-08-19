@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "contractVersion": 2,
+  "contractVersion": 3,
   "runtimeProtocolVersion": 1,
-  "starterContractCommit": "1d5e2524487c79ba11e2b0ad622e1a963f5cbce8",
+  "starterContractCommit": "4cf244eb7ed3f364e521af8c008f33b09376537e",
   "files": {
-    "src/client/noumi.d.ts": "3c118c667eedf13dfd0500acdb865d7e535999a484fabc923043ae30083e62dc"
+    "src/client/noumi.d.ts": "9913eed3e1699b3a6318ec1822ec7bc91a140ed888be33d142aa8838ef40d6d3"
   }
 }
