@@ -9,6 +9,7 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `src/client/main.tsx`: thin React mount.
 - `src/client/app.tsx`: page state and product UI.
 - `src/client/components/ui/*`: local component primitives.
+- `src/client/noumi.d.ts`: the single, self-contained public `window.NoumiBridge` type contract. It must not import or re-export types from `scripts/`; AI and editors must be able to understand the complete API from this file alone. Keep it compact by documenting only non-obvious public semantics, reusing existing named structures, and omitting the redundant `Noumi` prefix from declaration names; the runtime property remains `window.NoumiBridge`.
 - `src/client/styles.css`: Tailwind CSS v4 entry and semantic tokens.
 - `scripts/build-static.ts`: bundles React/CSS and emits one self-contained `dist/index.html`; the independently minified Browser Runtime and business bundle run in sequential isolated scopes so their short identifiers cannot collide.
 - `scripts/noumi-db-sdk.ts`: browser-only fluent/controlled-SQL SDK that produces virtual v1 Requests.
@@ -17,6 +18,7 @@ This repository is a pure frontend starter for AI-generated Light Systems. It ow
 - `scripts/noumi-outside-db.ts`: browser-only SDK for user-private external PostgreSQL; it validates slugs, bindings, limits, result envelopes and cancellation without exposing credentials or internal authority.
 - `scripts/noumi-workspace-files.ts`: browser-only SDK for files that belong in the current Project's collaborative Workspace.
 - `scripts/noumi-browser-runtime-client.ts`: validates the parent Bridge bootstrap and injects `window.NoumiBridge`.
+- `scripts/noumi-global-contract.typecheck.ts`: compile-only bidirectional checks that keep the flattened global declarations aligned with the split Runtime SDK source types.
 - `scripts/verify-static.ts`: parses and verifies the final inline browser module instead of checking only marker strings.
 - `noumi.db.json` and `db/migrations/*.sql`: shared database policy and append-only schema history.
 - `dist/`: ignored local build output; the platform rebuilds it from the synchronized source commit.
@@ -46,7 +48,7 @@ Commit source changes only, call `light_systems_artifacts_sync`, then call `ligh
 - The platform has no lifetime migration-count or byte cap. Each migration stays under 256 KiB and one publication's pending SQL under 1 MiB; an 8 MiB bootstrap guard applies only to the first publication before a trusted checkpoint exists. The local CLI does not pretend to know whether that checkpoint exists. DML, rename/drop, constraint changes and public policy tightening produce a user-confirmed impact preview.
 - The local schema CLI is only an authoring preflight and writes the `platform` schemaVersion sentinel. Publication independently computes the authoritative hash, replays and authorizes the exact migration source inside the dedicated DO, and then stores a trusted physical checkpoint.
 - Database calls are shared server persistence and require a signed-in Project member on every request. PUBLIC/password access only loads static UI; capability flags are not permission grants.
-- Database mutation builders require a filter or explicit `.all()`, use operation IDs for idempotency, and return `NoumiDbResult` envelopes for HTTP/data errors. Transport failure after a mutation is an unknown outcome; recover it through `db.operations.get(operationId)`.
+- Database mutation builders require a filter or explicit `.all()`, use operation IDs for idempotency, and return `DbResult` envelopes for HTTP/data errors. Transport failure after a mutation is an unknown outcome; recover it through `db.operations.get(operationId)`.
 - Browser-local storage is capped at 4 KiB per key, 1 MiB per value, and 5 MiB per Light System.
 - Relative `/api/*` is not a Light System backend and must not be used; only the injected SDKs may call their reserved platform data routes.
 - Direct requests to external APIs are allowed, but browser CORS rules determine whether JavaScript may read the response.
@@ -67,4 +69,4 @@ For PDF parsing, store the PDF in the appropriate file capability and one databa
 
 ## Contract
 
-The source repository must remain valid with `bun run db:validate` and buildable with `bun run build`; it must not commit `dist/` or a SQLite file. The build must emit `dist/index.html`; the starter intentionally keeps it self-contained. The platform validates static output and database migrations from the exact same source commit before promoting the deployment.
+The source repository must remain valid with `bun run db:validate` and buildable with `bun run build`; it must not commit `dist/` or a SQLite file. `src/client/noumi.d.ts` must remain one self-contained declaration file with no imports, while `bun run typecheck` proves that its public structures still match the split Runtime SDK implementations. The build must emit `dist/index.html`; the starter intentionally keeps it self-contained. The platform validates static output and database migrations from the exact same source commit before promoting the deployment.

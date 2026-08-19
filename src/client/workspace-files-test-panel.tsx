@@ -25,7 +25,7 @@ export function WorkspaceFilesTestPanel() {
 	const [text, setText] = useState(
 		"Hello from NoumiBridge.workspaceFiles",
 	);
-	const [entries, setEntries] = useState<NoumiWorkspaceEntry[]>([]);
+	const [entries, setEntries] = useState<WorkspaceEntry[]>([]);
 	const [message, setMessage] = useState("尚未执行 Workspace Files 操作");
 	const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);

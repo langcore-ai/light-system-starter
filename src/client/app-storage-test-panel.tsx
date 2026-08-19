@@ -15,7 +15,7 @@ export function AppStorageTestPanel() {
 	const [path, setPath] = useState("manual/hello.txt");
 	const [text, setText] = useState("Hello from NoumiBridge.appStorage");
 	const [file, setFile] = useState<File | null>(null);
-	const [objects, setObjects] = useState<NoumiAppStorageObject[]>([]);
+	const [objects, setObjects] = useState<AppStorageObject[]>([]);
 	const [message, setMessage] = useState("尚未执行 App Storage 操作");
 	const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);

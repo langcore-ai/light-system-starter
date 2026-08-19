@@ -1,258 +1,527 @@
-import type {
-	NoumiDatabase as NoumiDatabaseSdk,
-	NoumiDbCapabilities as NoumiDbCapabilitiesSdk,
-	NoumiDbError as NoumiDbErrorSdk,
-	NoumiDbFailure as NoumiDbFailureSdk,
-	NoumiDbJson as NoumiDbJsonSdk,
-	NoumiDbResult as NoumiDbResultSdk,
-	NoumiDbRow as NoumiDbRowSdk,
-	NoumiDbScalar as NoumiDbScalarSdk,
-	NoumiDbSuccess as NoumiDbSuccessSdk,
-} from "../../scripts/noumi-db-sdk";
-import type {
-	NoumiAppStorage as NoumiAppStorageSdk,
-	NoumiAppStorageCopyOptions as NoumiAppStorageCopyOptionsSdk,
-	NoumiAppStorageFile as NoumiAppStorageFileSdk,
-	NoumiAppStorageGetOptions as NoumiAppStorageGetOptionsSdk,
-	NoumiAppStorageListOptions as NoumiAppStorageListOptionsSdk,
-	NoumiAppStorageListPage as NoumiAppStorageListPageSdk,
-	NoumiAppStorageObject as NoumiAppStorageObjectSdk,
-	NoumiAppStoragePutOptions as NoumiAppStoragePutOptionsSdk,
-	NoumiAppStorageRequestOptions as NoumiAppStorageRequestOptionsSdk,
-	NoumiFileCapabilities as NoumiFileCapabilitiesSdk,
-	NoumiFileDownloadUrl as NoumiFileDownloadUrlSdk,
-	NoumiFileDownloadUrlOptions as NoumiFileDownloadUrlOptionsSdk,
-	NoumiFileInput as NoumiFileInputSdk,
-	NoumiFileRange as NoumiFileRangeSdk,
-	NoumiFileTransportError as NoumiFileTransportErrorSdk,
-} from "../../scripts/noumi-app-storage";
-import type {
-	NoumiWorkspaceCopyOptions as NoumiWorkspaceCopyOptionsSdk,
-	NoumiWorkspaceCreateDirectoryOptions as NoumiWorkspaceCreateDirectoryOptionsSdk,
-	NoumiWorkspaceDownloadUrlOptions as NoumiWorkspaceDownloadUrlOptionsSdk,
-	NoumiWorkspaceEntry as NoumiWorkspaceEntrySdk,
-	NoumiWorkspaceFile as NoumiWorkspaceFileSdk,
-	NoumiWorkspaceFiles as NoumiWorkspaceFilesSdk,
-	NoumiWorkspaceListOptions as NoumiWorkspaceListOptionsSdk,
-	NoumiWorkspaceListPage as NoumiWorkspaceListPageSdk,
-	NoumiWorkspaceMoveOptions as NoumiWorkspaceMoveOptionsSdk,
-	NoumiWorkspaceReadOptions as NoumiWorkspaceReadOptionsSdk,
-	NoumiWorkspaceRemoveOptions as NoumiWorkspaceRemoveOptionsSdk,
-	NoumiWorkspaceRemoveResult as NoumiWorkspaceRemoveResultSdk,
-	NoumiWorkspaceRequestOptions as NoumiWorkspaceRequestOptionsSdk,
-	NoumiWorkspaceTextFile as NoumiWorkspaceTextFileSdk,
-	NoumiWorkspaceTextReadOptions as NoumiWorkspaceTextReadOptionsSdk,
-	NoumiWorkspaceWriteOptions as NoumiWorkspaceWriteOptionsSdk,
-} from "../../scripts/noumi-workspace-files";
-import type {
-	NoumiOutsideDatabase as NoumiOutsideDatabaseSdk,
-	NoumiOutsideDbCapabilities as NoumiOutsideDbCapabilitiesSdk,
-	NoumiOutsideDbFactory as NoumiOutsideDbFactorySdk,
-	NoumiOutsideDbFailure as NoumiOutsideDbFailureSdk,
-	NoumiOutsideDbInputValue as NoumiOutsideDbInputValueSdk,
-	NoumiOutsideDbJson as NoumiOutsideDbJsonSdk,
-	NoumiOutsideDbResult as NoumiOutsideDbResultSdk,
-	NoumiOutsideDbRow as NoumiOutsideDbRowSdk,
-	NoumiOutsideDbSqlOptions as NoumiOutsideDbSqlOptionsSdk,
-	NoumiOutsideDbStatementResult as NoumiOutsideDbStatementResultSdk,
-	NoumiOutsideDbSuccess as NoumiOutsideDbSuccessSdk,
-	NoumiOutsideDbTaggedValue as NoumiOutsideDbTaggedValueSdk,
-	NoumiOutsideDbTransportError as NoumiOutsideDbTransportErrorSdk,
-	NoumiOutsideDbValue as NoumiOutsideDbValueSdk,
-} from "../../scripts/noumi-outside-db";
+/**
+ * NoumiBridge 自包含公共类型契约。
+ * 必须保持单文件、无 import，并由 noumi-global-contract.typecheck.ts 校验 Runtime 对齐。
+ */
 
-declare global {
-	/** Noumi DB 支持的标量。 */
-	type NoumiDbScalar = NoumiDbScalarSdk;
-	/** Noumi DB 支持的 JSON。 */
-	type NoumiDbJson = NoumiDbJsonSdk;
-	/** 默认数据库行形状。 */
-	type NoumiDbRow = NoumiDbRowSdk;
-	/** 当前 Browser Runtime/provider 数据库能力。 */
-	type NoumiDbCapabilities = NoumiDbCapabilitiesSdk;
-	/** 稳定数据库错误。 */
-	type NoumiDbError = NoumiDbErrorSdk;
-	/** 成功数据库结果。 */
-	type NoumiDbSuccess<T> = NoumiDbSuccessSdk<T>;
-	/** 失败数据库结果。 */
-	type NoumiDbFailure = NoumiDbFailureSdk;
-	/** 可通过 ok 判别的数据库结果。 */
-	type NoumiDbResult<T> = NoumiDbResultSdk<T>;
-	/** 当前轻系统的共享数据库 SDK。 */
-	type NoumiDatabase = NoumiDatabaseSdk;
-	/** App Storage 支持的文件输入。 */
-	type NoumiFileInput = NoumiFileInputSdk;
-	/** App Storage 字节范围。 */
-	type NoumiFileRange = NoumiFileRangeSdk;
-	/** 当前成员可观测的文件能力。 */
-	type NoumiFileCapabilities = NoumiFileCapabilitiesSdk;
-	/** 短期文件下载 URL。 */
-	type NoumiFileDownloadUrl = NoumiFileDownloadUrlSdk;
-	/** 下载 URL 选项。 */
-	type NoumiFileDownloadUrlOptions = NoumiFileDownloadUrlOptionsSdk;
-	/** App Storage 对象 metadata。 */
-	type NoumiAppStorageObject = NoumiAppStorageObjectSdk;
-	/** 带 Blob 内容的 App Storage 文件。 */
-	type NoumiAppStorageFile = NoumiAppStorageFileSdk;
-	/** App Storage put 选项。 */
-	type NoumiAppStoragePutOptions = NoumiAppStoragePutOptionsSdk;
-	/** App Storage get 选项。 */
-	type NoumiAppStorageGetOptions = NoumiAppStorageGetOptionsSdk;
-	/** App Storage list 选项。 */
-	type NoumiAppStorageListOptions = NoumiAppStorageListOptionsSdk;
-	/** App Storage list 分页结果。 */
-	type NoumiAppStorageListPage = NoumiAppStorageListPageSdk;
-	/** App Storage copy 选项。 */
-	type NoumiAppStorageCopyOptions = NoumiAppStorageCopyOptionsSdk;
-	/** 只承载 AbortSignal 的 App Storage 通用选项。 */
-	type NoumiAppStorageRequestOptions = NoumiAppStorageRequestOptionsSdk;
-	/** Bridge、网络或响应协议失败。 */
-	type NoumiFileTransportError = NoumiFileTransportErrorSdk;
-	/** 当前轻系统独享的跨 deployment 对象存储。 */
-	type NoumiAppStorage = NoumiAppStorageSdk;
-	/** Workspace 公开节点。 */
-	type NoumiWorkspaceEntry = NoumiWorkspaceEntrySdk;
-	/** Workspace 二进制文件读取结果。 */
-	type NoumiWorkspaceFile = NoumiWorkspaceFileSdk;
-	/** Workspace UTF-8 文本读取结果。 */
-	type NoumiWorkspaceTextFile = NoumiWorkspaceTextFileSdk;
-	/** Workspace 文件读取选项。 */
-	type NoumiWorkspaceReadOptions = NoumiWorkspaceReadOptionsSdk;
-	/** Workspace 文本读取选项。 */
-	type NoumiWorkspaceTextReadOptions = NoumiWorkspaceTextReadOptionsSdk;
-	/** Workspace 目录分页选项。 */
-	type NoumiWorkspaceListOptions = NoumiWorkspaceListOptionsSdk;
-	/** Workspace 目录分页结果。 */
-	type NoumiWorkspaceListPage = NoumiWorkspaceListPageSdk;
-	/** Workspace 文件写入选项。 */
-	type NoumiWorkspaceWriteOptions = NoumiWorkspaceWriteOptionsSdk;
-	/** Workspace 目录创建选项。 */
-	type NoumiWorkspaceCreateDirectoryOptions =
-		NoumiWorkspaceCreateDirectoryOptionsSdk;
-	/** Workspace move 选项。 */
-	type NoumiWorkspaceMoveOptions = NoumiWorkspaceMoveOptionsSdk;
-	/** Workspace copy 选项。 */
-	type NoumiWorkspaceCopyOptions = NoumiWorkspaceCopyOptionsSdk;
-	/** Workspace remove 选项。 */
-	type NoumiWorkspaceRemoveOptions = NoumiWorkspaceRemoveOptionsSdk;
-	/** Workspace remove 结果。 */
-	type NoumiWorkspaceRemoveResult = NoumiWorkspaceRemoveResultSdk;
-	/** Workspace 下载 URL 选项。 */
-	type NoumiWorkspaceDownloadUrlOptions =
-		NoumiWorkspaceDownloadUrlOptionsSdk;
-	/** Workspace 通用请求选项。 */
-	type NoumiWorkspaceRequestOptions = NoumiWorkspaceRequestOptionsSdk;
-	/** 当前轻系统所属 Project 的 Workspace 文件 SDK。 */
-	type NoumiWorkspaceFiles = NoumiWorkspaceFilesSdk;
-	/** 外部数据库可用性快照。 */
-	type NoumiOutsideDbCapabilities = NoumiOutsideDbCapabilitiesSdk;
-	/** 外部数据库稳定 JSON 值。 */
-	type NoumiOutsideDbJson = NoumiOutsideDbJsonSdk;
-	/** 外部数据库 tagged wire 值。 */
-	type NoumiOutsideDbTaggedValue = NoumiOutsideDbTaggedValueSdk;
-	/** `.sql()` 可接受的 binding。 */
-	type NoumiOutsideDbInputValue = NoumiOutsideDbInputValueSdk;
-	/** 外部数据库结果值。 */
-	type NoumiOutsideDbValue = NoumiOutsideDbValueSdk;
-	/** 默认外部数据库行。 */
-	type NoumiOutsideDbRow = NoumiOutsideDbRowSdk;
-	/** 单条 statement 结果。 */
-	type NoumiOutsideDbStatementResult<
-		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
-	> =
-		NoumiOutsideDbStatementResultSdk<T>;
-	/** 外部数据库 SQL 选项。 */
-	type NoumiOutsideDbSqlOptions = NoumiOutsideDbSqlOptionsSdk;
-	/** 外部数据库成功结果。 */
-	type NoumiOutsideDbSuccess<
-		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
-	> =
-		NoumiOutsideDbSuccessSdk<T>;
-	/** 外部数据库失败结果。 */
-	type NoumiOutsideDbFailure = NoumiOutsideDbFailureSdk;
-	/** 外部数据库可判别结果。 */
-	type NoumiOutsideDbResult<
-		T extends NoumiOutsideDbRow = NoumiOutsideDbRow,
-	> =
-		NoumiOutsideDbResultSdk<T>;
-	/** 一条用户私有外部数据库引用。 */
-	type NoumiOutsideDatabase = NoumiOutsideDatabaseSdk;
-	/** 外部数据库 callable factory。 */
-	type NoumiOutsideDbFactory = NoumiOutsideDbFactorySdk;
-	/** Bridge/网络/协议 transport 故障。 */
-	type NoumiOutsideDbTransportError = NoumiOutsideDbTransportErrorSdk;
+// Database
+type DbProtocolVersion = 1;
+type DbScalar = string | number | boolean | null;
+type DbJson =
+	| DbScalar
+	| DbJson[]
+	| { [key: string]: DbJson };
+type DbRow = Record<string, DbJson>;
+type DbCapabilities = {
+	dbProtocolVersion: 1;
+	structuredCrud: boolean;
+	sqlQuery: boolean;
+	sqlExecute: boolean;
+	operationRecovery: boolean;
+};
+type DbError = {
+	code: string;
+	message: string;
+	requestId: string;
+	retryable: boolean;
+	details?: string;
+	hint?: string;
+};
+type DbSuccess<T> = {
+	version: DbProtocolVersion;
+	ok: true;
+	data: T;
+	error: null;
+	count: number | null;
+	operationId: string | null;
+};
+type DbFailure = {
+	version: DbProtocolVersion;
+	ok: false;
+	data: null;
+	error: DbError;
+	count: null;
+	operationId: string | null;
+};
+type DbResult<T> = DbSuccess<T> | DbFailure;
+type DbColumns = "*" | string;
+type OrderOptions = { ascending?: boolean };
+type UpsertOptions = {
+	onConflict: readonly string[];
+	ignoreDuplicates?: boolean;
+};
+type ExecuteOptions = { signal?: AbortSignal };
+type SqlQueryOptions = ExecuteOptions;
+type SqlExecuteOptions = {
+	allowFullTable?: boolean;
+	signal?: AbortSignal;
+};
 
-	/** 轻系统可见的成员信息。 */
-	interface NoumiMember {
-		/** 成员邮箱。 */
-		email: string;
-		/** 成员展示名。 */
-		displayName: string | null;
-	}
+/** Fluent 查询的公共过滤方法。 */
+interface FilterMethods<Self> {
+	eq(column: string, value: DbScalar): Self;
+	neq(column: string, value: DbScalar): Self;
+	gt(column: string, value: Exclude<DbScalar, null>): Self;
+	gte(column: string, value: Exclude<DbScalar, null>): Self;
+	lt(column: string, value: Exclude<DbScalar, null>): Self;
+	lte(column: string, value: Exclude<DbScalar, null>): Self;
+	in(column: string, values: readonly Exclude<DbScalar, null>[]): Self;
+	is(column: string, value: null): Self;
+	isNot(column: string, value: null): Self;
+}
 
-	/** 主平台通过可信 iframe Bridge 注入的轻系统能力。 */
-	interface NoumiBridge {
-		/** 当前轻系统信息。 */
-		app: {
-			/** 轻系统展示名称。 */
-			name: string;
-		};
-		/** 创建当前轻系统的成员。 */
-		createByMember: NoumiMember;
-		/** 当前登录成员；公开匿名访问时为空。 */
-		currentMember: NoumiMember | null;
-		/** 当前页面的 best-effort 客户端错误诊断能力。 */
-		diagnostics: NoumiDiagnostics;
-		/** 与主前端 localStorage 隔离、按当前轻系统分区的异步浏览器存储。 */
-		localStorage: {
-			/** 写入字符串值。 */
-			setItem(key: string, value: string): Promise<void>;
-			/** 读取字符串值；键不存在时返回 null。 */
-			getItem(key: string): Promise<string | null>;
-			/** 删除一个键。 */
-			removeItem(key: string): Promise<void>;
-			/** 仅清空当前轻系统的全部键。 */
-			clear(): Promise<void>;
-			/** 返回当前轻系统的键数量。 */
-			length(): Promise<number>;
-			/** 返回当前轻系统的全部键。 */
-			keys(): Promise<string[]>;
-			/** 判断当前轻系统是否存在指定键。 */
-			has(key: string): Promise<boolean>;
-		};
-		/** 按不可变 LightSystem.id 隔离、跨 deployment 保留的对象存储。 */
-		readonly appStorage: NoumiAppStorage;
-		/** 代表当前成员操作当前轻系统所属 Project 的 Workspace 文件。 */
-		readonly workspaceFiles: NoumiWorkspaceFiles;
-		/** 按当前 Project、当前用户和 slug 解析的用户私有外部数据库。 */
-		readonly outsideDb: NoumiOutsideDbFactory;
-		/** 当前轻系统独享 SQLite 的受控 fluent/SQL 数据 API。 */
-		db: NoumiDatabase;
-	}
+interface SelectBuilder<Row extends object>
+	extends
+		PromiseLike<DbResult<Row[]>>,
+		FilterMethods<SelectBuilder<Row>> {
+	order(column: string, options?: OrderOptions): SelectBuilder<Row>;
+	limit(count: number): SelectBuilder<Row>;
+	range(from: number, to: number): SelectBuilder<Row>;
+	single(): TerminalBuilder<DbResult<Row>>;
+	maybeSingle(): TerminalBuilder<DbResult<Row | null>>;
+	execute(options?: ExecuteOptions): Promise<DbResult<Row[]>>;
+}
 
-	/** 主动报告已被业务代码捕获的异常；该调用不等待网络且永不抛出上报错误。 */
-	interface NoumiDiagnostics {
-		reportError(error: unknown, options?: NoumiReportErrorOptions): void;
-	}
+interface TerminalBuilder<Result> extends PromiseLike<Result> {
+	execute(options?: ExecuteOptions): Promise<Result>;
+}
 
-	/** 主动上报的稳定、低基数诊断标签。 */
-	interface NoumiReportErrorOptions {
-		component?: string;
-		operation?: string;
-		tags?: Readonly<Record<string, string | number | boolean | null>>;
-	}
+interface InsertBuilder<Row extends object>
+	extends PromiseLike<DbResult<null>> {
+	select(columns?: DbColumns): ReturningBuilder<Row>;
+	execute(options?: ExecuteOptions): Promise<DbResult<null>>;
+}
 
-	interface Window {
-		/**
-		 * 业务 bundle 执行前已完成初始化。
-		 * 身份验证仍由主系统 Cookie/Session 负责，这里只包含显式只读上下文和受控能力。
-		 */
-		NoumiBridge: NoumiBridge;
-		/** starter Error Boundary 专用内部入口，不属于公共 NoumiBridge API。 */
-		__NOUMI_REPORT_REACT_ERROR__(
-			error: unknown,
-			componentStack: unknown,
-		): void;
-		__LIGHT_SYSTEM_REACT_SPA_READY__?: boolean;
-	}
+/** update/delete 必须先添加过滤条件或显式调用 all()。 */
+interface MutationGuardBuilder<Row extends object>
+	extends FilterMethods<GuardedMutationBuilder<Row>> {
+	readonly then?: never;
+	all(): AllMutationBuilder<Row>;
+}
+
+interface GuardedMutationBuilder<Row extends object>
+	extends
+		PromiseLike<DbResult<null>>,
+		FilterMethods<GuardedMutationBuilder<Row>> {
+	select(columns?: DbColumns): ReturningBuilder<Row>;
+	execute(options?: ExecuteOptions): Promise<DbResult<null>>;
+}
+
+interface AllMutationBuilder<Row extends object>
+	extends PromiseLike<DbResult<null>> {
+	select(columns?: DbColumns): ReturningBuilder<Row>;
+	execute(options?: ExecuteOptions): Promise<DbResult<null>>;
+}
+
+interface ReturningBuilder<Row extends object>
+	extends PromiseLike<DbResult<Row[]>> {
+	single(): TerminalBuilder<DbResult<Row>>;
+	maybeSingle(): TerminalBuilder<DbResult<Row | null>>;
+	execute(options?: ExecuteOptions): Promise<DbResult<Row[]>>;
+}
+
+interface TableRef<Row extends object> {
+	select(columns?: DbColumns): SelectBuilder<Row>;
+	insert(row: Partial<Row> | readonly Partial<Row>[]): InsertBuilder<Row>;
+	update(patch: Partial<Row>): MutationGuardBuilder<Row>;
+	upsert(
+		row: Partial<Row> | readonly Partial<Row>[],
+		options: UpsertOptions,
+	): InsertBuilder<Row>;
+	delete(): MutationGuardBuilder<Row>;
+}
+
+interface Sql {
+	query<Row extends object = DbRow>(
+		statement: string,
+		bindings?: readonly DbScalar[],
+		options?: SqlQueryOptions,
+	): Promise<DbResult<Row[]>>;
+	execute<Row extends object = DbRow>(
+		statement: string,
+		bindings?: readonly DbScalar[],
+		options?: SqlExecuteOptions,
+	): Promise<DbResult<Row[] | null>>;
+}
+
+type DbOperationStatus = "pending" | "succeeded" | "failed";
+type DbOperationResult<T> = {
+	operationId: string;
+	status: DbOperationStatus;
+	result: DbResult<T> | null;
+	retryAfterMs: number | null;
+};
+
+interface DbOperations {
+	get<T = unknown>(
+		operationId: string,
+	): Promise<DbResult<DbOperationResult<T>>>;
+}
+
+interface Database {
+	from<Row extends object = DbRow>(table: string): TableRef<Row>;
+	readonly capabilities: DbCapabilities;
+	readonly sql: Sql;
+	readonly operations: DbOperations;
+}
+
+// App Storage
+type FileCapabilities = {
+	protocolVersion: 1;
+	read: boolean;
+	write: boolean;
+	maxFileBytes: number;
+};
+type FileInput = string | Blob | ArrayBuffer | Uint8Array;
+type FileRange = { offset: number; length?: number };
+type FileDownloadUrl = {
+	url: string;
+	expiresAt: string;
+	etag: string;
+};
+type AppStorageObject = {
+	path: string;
+	size: number;
+	etag: string;
+	contentType: string;
+	uploadedAt: string;
+	metadata: Readonly<Record<string, string>>;
+};
+type AppStorageFile = AppStorageObject & {
+	body: Blob;
+	range: { offset: number; length: number; totalSize: number } | null;
+};
+type AppStoragePutOptions = {
+	contentType?: string;
+	metadata?: Readonly<Record<string, string>>;
+	ifMatch?: string;
+	ifNoneMatch?: boolean;
+	signal?: AbortSignal;
+};
+type AppStorageGetOptions = {
+	range?: FileRange;
+	ifMatch?: string;
+	signal?: AbortSignal;
+};
+type AppStorageListOptions = {
+	prefix?: string;
+	cursor?: string;
+	limit?: number;
+	groupByDirectory?: boolean;
+	signal?: AbortSignal;
+};
+type AppStorageListPage = {
+	objects: AppStorageObject[];
+	directories: string[];
+	cursor: string | null;
+};
+type AppStorageCopyOptions = {
+	sourceIfMatch?: string;
+	overwrite?: boolean;
+	signal?: AbortSignal;
+};
+type FileDownloadUrlOptions = {
+	disposition?: "inline" | "attachment";
+	fileName?: string;
+	signal?: AbortSignal;
+};
+type AppStorageRequestOptions = ExecuteOptions;
+type FileTransportError = Error & {
+	code: "NOUMI_FILE_TRANSPORT";
+	requestId: string | null;
+	outcome: "not-sent" | "unknown";
+};
+
+/** 当前轻系统独享、跨 deployment 保留的对象存储。 */
+interface AppStorage {
+	readonly capabilities: Readonly<FileCapabilities>;
+	put(
+		path: string,
+		data: FileInput,
+		options?: AppStoragePutOptions,
+	): Promise<AppStorageObject>;
+	get(
+		path: string,
+		options?: AppStorageGetOptions,
+	): Promise<AppStorageFile>;
+	head(
+		path: string,
+		options?: AppStorageRequestOptions,
+	): Promise<AppStorageObject | null>;
+	list(options?: AppStorageListOptions): Promise<AppStorageListPage>;
+	delete(
+		path: string,
+		options?: AppStorageRequestOptions,
+	): Promise<{ deleted: boolean }>;
+	copy(
+		sourcePath: string,
+		destinationPath: string,
+		options?: AppStorageCopyOptions,
+	): Promise<AppStorageObject>;
+	createDownloadUrl(
+		path: string,
+		options?: FileDownloadUrlOptions,
+	): Promise<FileDownloadUrl>;
+}
+
+// Workspace Files
+type WorkspaceEntry = {
+	id: string;
+	path: string;
+	name: string;
+	type: "file" | "directory";
+	size: number | null;
+	etag: string | null;
+	contentType: string | null;
+	modifiedAt: string;
+};
+type WorkspaceFile = {
+	entry: WorkspaceEntry & { type: "file"; etag: string };
+	body: Blob;
+	range: { offset: number; length: number; totalSize: number } | null;
+};
+type WorkspaceTextFile = {
+	entry: WorkspaceEntry & { type: "file"; etag: string };
+	text: string;
+};
+type WorkspaceReadOptions = {
+	range?: FileRange;
+	ifMatch?: string;
+	expectedNodeId?: string;
+	signal?: AbortSignal;
+};
+type WorkspaceTextReadOptions = Omit<
+	WorkspaceReadOptions,
+	"range"
+>;
+type WorkspaceListOptions = {
+	cursor?: string;
+	limit?: number;
+	signal?: AbortSignal;
+};
+type WorkspaceListPage = {
+	entries: WorkspaceEntry[];
+	cursor: string | null;
+};
+type WorkspaceWriteOptions = {
+	contentType?: string;
+	overwrite?: boolean;
+	ifMatch?: string;
+	expectedNodeId?: string;
+	signal?: AbortSignal;
+};
+type WorkspaceCreateDirectoryOptions = {
+	recursive?: boolean;
+	signal?: AbortSignal;
+};
+type WorkspaceMoveOptions = {
+	overwrite?: boolean;
+	sourceIfMatch?: string;
+	expectedSourceNodeId?: string;
+	signal?: AbortSignal;
+};
+type WorkspaceCopyOptions = WorkspaceMoveOptions;
+type WorkspaceRemoveOptions = {
+	recursive?: boolean;
+	ifMatch?: string;
+	expectedNodeId?: string;
+	signal?: AbortSignal;
+};
+type WorkspaceRemoveResult = {
+	path: string;
+	removedNodeCount: number;
+};
+type WorkspaceDownloadUrlOptions = FileDownloadUrlOptions & {
+	ifMatch?: string;
+	expectedNodeId?: string;
+};
+type WorkspaceRequestOptions = ExecuteOptions;
+
+/** 当前 Project 的协作 Workspace 文件能力。 */
+interface WorkspaceFiles {
+	readonly capabilities: Readonly<FileCapabilities>;
+	stat(
+		path: string,
+		options?: WorkspaceRequestOptions,
+	): Promise<WorkspaceEntry | null>;
+	listDirectory(
+		path?: string,
+		options?: WorkspaceListOptions,
+	): Promise<WorkspaceListPage>;
+	readFile(
+		path: string,
+		options?: WorkspaceReadOptions,
+	): Promise<WorkspaceFile>;
+	readTextFile(
+		path: string,
+		options?: WorkspaceTextReadOptions,
+	): Promise<WorkspaceTextFile>;
+	writeFile(
+		path: string,
+		data: FileInput,
+		options?: WorkspaceWriteOptions,
+	): Promise<WorkspaceEntry>;
+	createDirectory(
+		path: string,
+		options?: WorkspaceCreateDirectoryOptions,
+	): Promise<WorkspaceEntry>;
+	move(
+		sourcePath: string,
+		destinationPath: string,
+		options?: WorkspaceMoveOptions,
+	): Promise<WorkspaceEntry>;
+	copy(
+		sourcePath: string,
+		destinationPath: string,
+		options?: WorkspaceCopyOptions,
+	): Promise<WorkspaceEntry>;
+	remove(
+		path: string,
+		options?: WorkspaceRemoveOptions,
+	): Promise<WorkspaceRemoveResult>;
+	createDownloadUrl(
+		path: string,
+		options?: WorkspaceDownloadUrlOptions,
+	): Promise<FileDownloadUrl>;
+}
+
+// Outside Database
+type OutsideDbCapabilities = {
+	protocolVersion: 1;
+	available: boolean;
+	driver: "POSTGRESQL";
+};
+type OutsideDbJson =
+	| null
+	| boolean
+	| number
+	| string
+	| OutsideDbJson[]
+	| { [key: string]: OutsideDbJson };
+type OutsideDbTaggedValue =
+	| { $noumiType: "bigint"; value: string }
+	| { $noumiType: "decimal"; value: string }
+	| { $noumiType: "bytes"; value: string }
+	| { $noumiType: "date"; value: string }
+	| { $noumiType: "json"; value: OutsideDbJson };
+type OutsideDbInputValue =
+	| null
+	| boolean
+	| number
+	| string
+	| bigint
+	| Date
+	| Uint8Array
+	| OutsideDbJson[]
+	| { [key: string]: OutsideDbJson }
+	| OutsideDbTaggedValue;
+type OutsideDbValue =
+	| OutsideDbJson
+	| Exclude<OutsideDbTaggedValue, { $noumiType: "json" }>;
+type OutsideDbRow = Record<string, OutsideDbValue>;
+type OutsideDbStatementResult<
+	T extends OutsideDbRow = OutsideDbRow,
+> = {
+	command: string | null;
+	rowCount: number | null;
+	rows: T[];
+};
+type OutsideDbSqlOptions = {
+	/** 100ms 到 60s；默认 15s。 */
+	timeoutMs?: number;
+	/** 仅停止等待并发送 best-effort cancel。 */
+	signal?: AbortSignal;
+};
+type OutsideDbSuccess<
+	T extends OutsideDbRow = OutsideDbRow,
+> = {
+	version: 1;
+	ok: true;
+	data: { results: OutsideDbStatementResult<T>[] };
+	error: null;
+	executionId: string;
+};
+type OutsideDbFailure = {
+	version: 1;
+	ok: false;
+	data: null;
+	error: {
+		code: string;
+		message: string;
+		requestId: string;
+		retryable: boolean;
+		outcome?: "not-sent" | "unknown";
+	};
+	executionId: string | null;
+};
+type OutsideDbResult<
+	T extends OutsideDbRow = OutsideDbRow,
+> = OutsideDbSuccess<T> | OutsideDbFailure;
+
+interface OutsideDatabase {
+	/** 单次调用使用一条连接；跨调用 transaction 不受支持。 */
+	sql<T extends OutsideDbRow = OutsideDbRow>(
+		sqlText: string,
+		bindings?: readonly OutsideDbInputValue[],
+		options?: OutsideDbSqlOptions,
+	): Promise<OutsideDbResult<T>>;
+}
+
+interface OutsideDbFactory {
+	(slug: string): OutsideDatabase;
+	readonly capabilities: OutsideDbCapabilities;
+}
+
+type OutsideDbTransportError = Error & {
+	readonly requestId: string | null;
+	readonly outcome: "not-sent" | "unknown";
+};
+
+// Bridge
+interface MemberInfo {
+	email: string;
+	displayName: string | null;
+}
+
+/** 主平台在业务 bundle 执行前注入的可信 iframe Bridge。 */
+interface Bridge {
+	app: { name: string };
+	createByMember: MemberInfo;
+	/** 公开匿名访问时为空。 */
+	currentMember: MemberInfo | null;
+	diagnostics: Diagnostics;
+	/** 与主前端隔离、按当前轻系统分区的异步浏览器存储。 */
+	localStorage: {
+		setItem(key: string, value: string): Promise<void>;
+		getItem(key: string): Promise<string | null>;
+		removeItem(key: string): Promise<void>;
+		clear(): Promise<void>;
+		length(): Promise<number>;
+		keys(): Promise<string[]>;
+		has(key: string): Promise<boolean>;
+	};
+	readonly appStorage: AppStorage;
+	readonly workspaceFiles: WorkspaceFiles;
+	readonly outsideDb: OutsideDbFactory;
+	db: Database;
+}
+
+/** 上报已捕获异常；调用不等待网络且不抛出上报错误。 */
+interface Diagnostics {
+	reportError(error: unknown, options?: ReportErrorOptions): void;
+}
+
+interface ReportErrorOptions {
+	component?: string;
+	operation?: string;
+	tags?: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+interface Window {
+	NoumiBridge: Bridge;
+	/** starter Error Boundary 内部入口，不属于 NoumiBridge API。 */
+	__NOUMI_REPORT_REACT_ERROR__(
+		error: unknown,
+		componentStack: unknown,
+	): void;
+	__LIGHT_SYSTEM_REACT_SPA_READY__?: boolean;
 }

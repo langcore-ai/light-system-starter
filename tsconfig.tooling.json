@@ -4,5 +4,6 @@
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["bun-types", "vite/client"]
 	},
-	"include": ["scripts/**/*.ts", "vite.config.ts"]
+	"include": ["scripts/**/*.ts", "vite.config.ts"],
+	"exclude": ["scripts/noumi-global-contract.typecheck.ts"]
 }
