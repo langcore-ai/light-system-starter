@@ -24,7 +24,7 @@ type Task = {
 };
 
 /** 把 SDK failure envelope 转成适合人工验收的短消息。 */
-function resultError(result: DbFailure): string {
+function resultError(result: Noumi.DbFailure): string {
 	return `${result.error.code}: ${result.error.message}`;
 }
 
@@ -85,7 +85,7 @@ export function App() {
 	}, [loadTasks]);
 
 	/** 串行执行一次 mutation，并在成功后刷新可见数据。 */
-	async function mutate(operation: () => Promise<DbResult<unknown>>) {
+	async function mutate(operation: () => Promise<Noumi.DbResult<unknown>>) {
 		setBusy(true);
 		try {
 			const result = await operation();

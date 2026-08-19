@@ -3,6 +3,11 @@
  * 必须保持单文件、无 import，并由 noumi-global-contract.typecheck.ts 校验 Runtime 对齐。
  */
 
+/**
+ * 轻系统公开类型统一收口在 Noumi 命名空间，避免短类型名污染业务全局作用域。
+ */
+declare namespace Noumi {
+
 // Database
 type DbProtocolVersion = 1;
 type DbScalar = string | number | boolean | null;
@@ -516,8 +521,10 @@ interface ReportErrorOptions {
 	tags?: Readonly<Record<string, string | number | boolean | null>>;
 }
 
+}
+
 interface Window {
-	NoumiBridge: Bridge;
+	NoumiBridge: Noumi.Bridge;
 	/** starter Error Boundary 内部入口，不属于 NoumiBridge API。 */
 	__NOUMI_REPORT_REACT_ERROR__(
 		error: unknown,

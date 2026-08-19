@@ -75,21 +75,21 @@ type AssertEquivalent<Value extends true> = Value;
 
 /** App Storage 全局声明的完整公共结构。 */
 type GlobalAppStorageContract = {
-	capabilities: FileCapabilities;
-	input: FileInput;
-	range: FileRange;
-	download: FileDownloadUrl;
-	downloadOptions: FileDownloadUrlOptions;
-	object: AppStorageObject;
-	file: AppStorageFile;
-	putOptions: AppStoragePutOptions;
-	getOptions: AppStorageGetOptions;
-	listOptions: AppStorageListOptions;
-	listPage: AppStorageListPage;
-	copyOptions: AppStorageCopyOptions;
-	requestOptions: AppStorageRequestOptions;
-	transportError: FileTransportError;
-	storage: AppStorage;
+	capabilities: Noumi.FileCapabilities;
+	input: Noumi.FileInput;
+	range: Noumi.FileRange;
+	download: Noumi.FileDownloadUrl;
+	downloadOptions: Noumi.FileDownloadUrlOptions;
+	object: Noumi.AppStorageObject;
+	file: Noumi.AppStorageFile;
+	putOptions: Noumi.AppStoragePutOptions;
+	getOptions: Noumi.AppStorageGetOptions;
+	listOptions: Noumi.AppStorageListOptions;
+	listPage: Noumi.AppStorageListPage;
+	copyOptions: Noumi.AppStorageCopyOptions;
+	requestOptions: Noumi.AppStorageRequestOptions;
+	transportError: Noumi.FileTransportError;
+	storage: Noumi.AppStorage;
 };
 
 /** Runtime App Storage SDK 的同一公共结构。 */
@@ -113,22 +113,22 @@ type RuntimeAppStorageContract = {
 
 /** Workspace Files 全局声明的完整公共结构。 */
 type GlobalWorkspaceContract = {
-	entry: WorkspaceEntry;
-	file: WorkspaceFile;
-	textFile: WorkspaceTextFile;
-	readOptions: WorkspaceReadOptions;
-	textReadOptions: WorkspaceTextReadOptions;
-	listOptions: WorkspaceListOptions;
-	listPage: WorkspaceListPage;
-	writeOptions: WorkspaceWriteOptions;
-	createDirectoryOptions: WorkspaceCreateDirectoryOptions;
-	moveOptions: WorkspaceMoveOptions;
-	copyOptions: WorkspaceCopyOptions;
-	removeOptions: WorkspaceRemoveOptions;
-	removeResult: WorkspaceRemoveResult;
-	downloadOptions: WorkspaceDownloadUrlOptions;
-	requestOptions: WorkspaceRequestOptions;
-	files: WorkspaceFiles;
+	entry: Noumi.WorkspaceEntry;
+	file: Noumi.WorkspaceFile;
+	textFile: Noumi.WorkspaceTextFile;
+	readOptions: Noumi.WorkspaceReadOptions;
+	textReadOptions: Noumi.WorkspaceTextReadOptions;
+	listOptions: Noumi.WorkspaceListOptions;
+	listPage: Noumi.WorkspaceListPage;
+	writeOptions: Noumi.WorkspaceWriteOptions;
+	createDirectoryOptions: Noumi.WorkspaceCreateDirectoryOptions;
+	moveOptions: Noumi.WorkspaceMoveOptions;
+	copyOptions: Noumi.WorkspaceCopyOptions;
+	removeOptions: Noumi.WorkspaceRemoveOptions;
+	removeResult: Noumi.WorkspaceRemoveResult;
+	downloadOptions: Noumi.WorkspaceDownloadUrlOptions;
+	requestOptions: Noumi.WorkspaceRequestOptions;
+	files: Noumi.WorkspaceFiles;
 };
 
 /** Runtime Workspace Files SDK 的同一公共结构。 */
@@ -153,20 +153,20 @@ type RuntimeWorkspaceContract = {
 
 /** 外部数据库全局声明的完整公共结构。 */
 type GlobalOutsideDatabaseContract = {
-	capabilities: OutsideDbCapabilities;
-	json: OutsideDbJson;
-	tagged: OutsideDbTaggedValue;
-	input: OutsideDbInputValue;
-	value: OutsideDbValue;
-	row: OutsideDbRow;
-	statement: OutsideDbStatementResult<{ id: string }>;
-	options: OutsideDbSqlOptions;
-	success: OutsideDbSuccess<{ id: string }>;
-	failure: OutsideDbFailure;
-	result: OutsideDbResult<{ id: string }>;
-	database: OutsideDatabase;
-	factory: OutsideDbFactory;
-	transportError: OutsideDbTransportError;
+	capabilities: Noumi.OutsideDbCapabilities;
+	json: Noumi.OutsideDbJson;
+	tagged: Noumi.OutsideDbTaggedValue;
+	input: Noumi.OutsideDbInputValue;
+	value: Noumi.OutsideDbValue;
+	row: Noumi.OutsideDbRow;
+	statement: Noumi.OutsideDbStatementResult<{ id: string }>;
+	options: Noumi.OutsideDbSqlOptions;
+	success: Noumi.OutsideDbSuccess<{ id: string }>;
+	failure: Noumi.OutsideDbFailure;
+	result: Noumi.OutsideDbResult<{ id: string }>;
+	database: Noumi.OutsideDatabase;
+	factory: Noumi.OutsideDbFactory;
+	transportError: Noumi.OutsideDbTransportError;
 };
 
 /** Runtime 外部数据库 SDK 的同一公共结构。 */
@@ -189,44 +189,44 @@ type RuntimeOutsideDatabaseContract = {
 
 /** 修改任一 Runtime 公开类型时，以下契约必须继续全部成立。 */
 type _DatabaseScalarMatches = AssertEquivalent<
-	IsEquivalent<DbScalar, RuntimeDbScalar>
+	IsEquivalent<Noumi.DbScalar, RuntimeDbScalar>
 >;
 type _DatabaseJsonMatches = AssertEquivalent<
-	IsEquivalent<DbJson, RuntimeDbJson>
+	IsEquivalent<Noumi.DbJson, RuntimeDbJson>
 >;
 type _DatabaseRowMatches = AssertEquivalent<
-	IsEquivalent<DbRow, RuntimeDbRow>
+	IsEquivalent<Noumi.DbRow, RuntimeDbRow>
 >;
 type _DatabaseCapabilitiesMatch = AssertEquivalent<
-	IsEquivalent<DbCapabilities, RuntimeDbCapabilities>
+	IsEquivalent<Noumi.DbCapabilities, RuntimeDbCapabilities>
 >;
 type _DatabaseErrorMatches = AssertEquivalent<
-	IsEquivalent<DbError, RuntimeDbError>
+	IsEquivalent<Noumi.DbError, RuntimeDbError>
 >;
 type _DatabaseSuccessMatches = AssertEquivalent<
-	IsEquivalent<DbSuccess<{ id: string }>, RuntimeDbSuccess<{ id: string }>>
+	IsEquivalent<Noumi.DbSuccess<{ id: string }>, RuntimeDbSuccess<{ id: string }>>
 >;
 type _DatabaseFailureMatches = AssertEquivalent<
-	IsEquivalent<DbFailure, RuntimeDbFailure>
+	IsEquivalent<Noumi.DbFailure, RuntimeDbFailure>
 >;
 type _DatabaseResultMatches = AssertEquivalent<
-	IsEquivalent<DbResult<{ id: string }>, RuntimeDbResult<{ id: string }>>
+	IsEquivalent<Noumi.DbResult<{ id: string }>, RuntimeDbResult<{ id: string }>>
 >;
 type _DatabaseSdkWithoutOperationsMatches = AssertEquivalent<
 	IsEquivalent<
-		Omit<Database, "operations">,
+		Omit<Noumi.Database, "operations">,
 		Omit<RuntimeDatabase, "operations">
 	>
 >;
 type _DatabaseOperationResultMatches = AssertEquivalent<
 	IsEquivalent<
-		DbOperationResult<{ id: string }>,
+		Noumi.DbOperationResult<{ id: string }>,
 		RuntimeDbOperationResult<{ id: string }>
 	>
 >;
 type _DatabaseDefaultOperationGetMatches = AssertEquivalent<
 	IsEquivalent<
-		ReturnType<DbOperations["get"]>,
+		ReturnType<Noumi.DbOperations["get"]>,
 		ReturnType<RuntimeDbOperations["get"]>
 	>
 >;
