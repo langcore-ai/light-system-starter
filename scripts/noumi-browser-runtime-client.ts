@@ -413,7 +413,8 @@ const databaseTransport: NoumiDbTransport = async (request, options) => {
 		url: request.url,
 		method: request.method,
 		headers: [...request.headers.entries()],
-		body: request.body === null ? null : await request.text(),
+		// Firefox 的空 Request body 可能非 null；GET/HEAD 按方法省略。
+		body: request.method === "GET" || request.method === "HEAD" || request.body === null ? null : await request.text(),
 	}, options?.signal);
 	if (!isBridgeDatabaseResponse(response)) {
 		throw new Error("Noumi database Bridge response is invalid");
