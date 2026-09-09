@@ -153,7 +153,7 @@ async function main() {
 	const inlineJavascript =
 		`await (async()=>{\n${browserRuntime.code}\n})();\nawait (async()=>{\n${javascript}\n})();`;
 	const htmlPrefix =
-		`<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Light System</title><style>${escapeInlineSource(css, "style")}</style></head><body><div id="root" data-light-system-root="true"></div><script type="module">\n`;
+		`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Light System</title><style>${escapeInlineSource(css, "style")}</style></head><body><div id="root" data-light-system-root="true"></div><script type="module">\n`;
 	const html =
 		`${htmlPrefix}${escapeInlineSource(inlineJavascript, "script")}\n</script></body></html>`;
 	const scriptStartLine = countNewlines(htmlPrefix);

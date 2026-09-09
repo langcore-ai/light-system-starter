@@ -10,29 +10,29 @@ import {
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
 
-/** starter fixture 的可见 App Storage 人工验收区域。 */
+/** Visible App Storage acceptance fixture. */
 export function AppStorageTestPanel() {
 	const [path, setPath] = useState("manual/hello.txt");
 	const [text, setText] = useState("Hello from NoumiBridge.appStorage");
 	const [file, setFile] = useState<File | null>(null);
 	const [objects, setObjects] = useState<Noumi.AppStorageObject[]>([]);
-	const [message, setMessage] = useState("尚未执行 App Storage 操作");
+	const [message, setMessage] = useState("No App Storage operation run yet");
 	const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const capabilities = window.NoumiBridge.appStorage.capabilities;
 
-	/** 刷新当前 Light System 的对象列表。 */
+	/** Refresh the current Light System's object list. */
 	const refresh = useCallback(async () => {
 		if (!capabilities.read) {
-			setMessage("当前成员没有 App Storage read 权限");
+			setMessage("The current member lacks App Storage read permission");
 			return;
 		}
 		try {
 			const page = await window.NoumiBridge.appStorage.list({ limit: 100 });
 			setObjects(page.objects);
-			setMessage(`已列出 ${page.objects.length} 个对象`);
+			setMessage(`Listed ${page.objects.length} object(s)`);
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "App Storage list 失败");
+			setMessage(error instanceof Error ? error.message : "App Storage list failed");
 		}
 	}, [capabilities.read]);
 
@@ -40,7 +40,7 @@ export function AppStorageTestPanel() {
 		void refresh();
 	}, [refresh]);
 
-	/** 串行执行人工 mutation，避免同一个表单制造无意义并发。 */
+	/** Run a fixture mutation serially to avoid redundant form concurrency. */
 	async function mutate(action: () => Promise<void>) {
 		setBusy(true);
 		setDownloadUrl(null);
@@ -48,13 +48,13 @@ export function AppStorageTestPanel() {
 			await action();
 			await refresh();
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "App Storage 操作失败");
+			setMessage(error instanceof Error ? error.message : "App Storage operation failed");
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 上传选中的二进制文件或当前文本。 */
+	/** Upload the selected binary file or current text. */
 	function upload() {
 		void mutate(async () => {
 			const input = file ?? text;
@@ -66,11 +66,11 @@ export function AppStorageTestPanel() {
 					metadata: { fixture: "starter", source: file ? "file" : "text" },
 				},
 			);
-			setMessage(`已上传 ${uploaded.path}（${uploaded.size} bytes）`);
+			setMessage(`Uploaded ${uploaded.path} (${uploaded.size} bytes)`);
 		});
 	}
 
-	/** 读取当前 path；文本可直接回填，二进制显示 Blob 信息。 */
+	/** Read the current path; refill text or show Blob metadata for binary content. */
 	async function readCurrent() {
 		setBusy(true);
 		setDownloadUrl(null);
@@ -80,16 +80,16 @@ export function AppStorageTestPanel() {
 				setText(await result.body.text());
 			}
 			setMessage(
-				`已读取 ${result.path}（${result.body.size} bytes, ${result.contentType}）`,
+				`Read ${result.path} (${result.body.size} bytes, ${result.contentType})`,
 			);
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "App Storage get 失败");
+			setMessage(error instanceof Error ? error.message : "App Storage get failed");
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 复制到显式新 path，人工验证非原子 move 语义。 */
+	/** Copy to an explicit new path to verify non-atomic move semantics. */
 	function copyCurrent() {
 		void mutate(async () => {
 			const copied = await window.NoumiBridge.appStorage.copy(
@@ -97,11 +97,11 @@ export function AppStorageTestPanel() {
 				`${path}.copy`,
 				{ overwrite: true },
 			);
-			setMessage(`已复制到 ${copied.path}`);
+			setMessage(`Copied to ${copied.path}`);
 		});
 	}
 
-	/** 创建一次性短期下载 URL。 */
+	/** Create a short-lived one-time download URL. */
 	async function createDownload() {
 		setBusy(true);
 		try {
@@ -110,19 +110,19 @@ export function AppStorageTestPanel() {
 				{ disposition: "attachment" },
 			);
 			setDownloadUrl(download.url);
-			setMessage(`下载 URL 有效至 ${download.expiresAt}`);
+			setMessage(`Download URL valid until ${download.expiresAt}`);
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "创建下载 URL 失败");
+			setMessage(error instanceof Error ? error.message : "Creating download URL failed");
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 幂等删除当前 path。 */
+	/** Idempotently delete the current path. */
 	function deleteCurrent() {
 		void mutate(async () => {
 			const result = await window.NoumiBridge.appStorage.delete(path);
-			setMessage(result.deleted ? `已删除 ${path}` : `${path} 原本不存在`);
+			setMessage(result.deleted ? `Deleted ${path}` : `${path} did not exist`);
 		});
 	}
 
@@ -133,16 +133,16 @@ export function AppStorageTestPanel() {
 					<FolderOpen className="size-5" />
 				</div>
 				<div className="min-w-0">
-					<h2 className="font-semibold">App Storage 测试</h2>
+					<h2 className="font-semibold">App Storage Test</h2>
 					<p className="mt-1 text-sm leading-6 text-muted-foreground">
-						对象按当前 Light System 隔离并跨发布保留；文件字节直接走短期 ticket，不进入 Bridge JSON。
+						Objects are isolated by Light System and survive deployments; file bytes use a short-lived ticket and do not enter Bridge JSON.
 					</p>
 				</div>
 			</div>
 
 			<div className="grid gap-3">
 				<label className="grid gap-1 text-sm">
-					<span className="font-medium">逻辑 path</span>
+					<span className="font-medium">Logical path</span>
 					<input
 						className="min-w-0 rounded-md border bg-background px-3 py-2 outline-none ring-ring focus:ring-2"
 						onChange={(event) => setPath(event.target.value)}
@@ -150,7 +150,7 @@ export function AppStorageTestPanel() {
 					/>
 				</label>
 				<label className="grid gap-1 text-sm">
-					<span className="font-medium">文本内容</span>
+					<span className="font-medium">Text content</span>
 					<textarea
 						className="min-h-24 resize-y rounded-md border bg-background px-3 py-2 outline-none ring-ring focus:ring-2"
 						onChange={(event) => setText(event.target.value)}
@@ -158,7 +158,7 @@ export function AppStorageTestPanel() {
 					/>
 				</label>
 				<label className="grid gap-1 text-sm">
-					<span className="font-medium">或选择二进制文件</span>
+					<span className="font-medium">Or choose a binary file</span>
 					<input
 						className="min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
 						onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -173,7 +173,7 @@ export function AppStorageTestPanel() {
 					onClick={upload}
 					type="button"
 				>
-					<FileUp data-icon="inline-start" />上传
+					<FileUp data-icon="inline-start" />Upload
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read || !path}
@@ -181,7 +181,7 @@ export function AppStorageTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<FolderOpen data-icon="inline-start" />读取
+					<FolderOpen data-icon="inline-start" />Read
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read}
@@ -189,7 +189,7 @@ export function AppStorageTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<RefreshCw data-icon="inline-start" />刷新列表
+					<RefreshCw data-icon="inline-start" />Refresh list
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
@@ -197,7 +197,7 @@ export function AppStorageTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<Copy data-icon="inline-start" />复制
+					<Copy data-icon="inline-start" />Copy
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read || !path}
@@ -205,7 +205,7 @@ export function AppStorageTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<Download data-icon="inline-start" />下载 URL
+					<Download data-icon="inline-start" />Download URL
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
@@ -213,7 +213,7 @@ export function AppStorageTestPanel() {
 					type="button"
 					variant="destructive"
 				>
-					<Trash2 data-icon="inline-start" />删除
+					<Trash2 data-icon="inline-start" />Delete
 				</Button>
 			</div>
 
@@ -228,7 +228,7 @@ export function AppStorageTestPanel() {
 						href={downloadUrl}
 						rel="noreferrer"
 					>
-						下载文件
+						Download file
 					</a>
 				)}
 				<ul className="mt-3 grid gap-1 text-xs">

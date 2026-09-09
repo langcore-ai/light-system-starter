@@ -13,30 +13,30 @@ import {
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
 
-/** 返回 Workspace path 的父目录；根目录下文件返回空字符串。 */
+/** Return the parent directory of a Workspace path; root-level files return an empty string. */
 function parentDirectory(path: string): string {
 	const separator = path.lastIndexOf("/");
 	return separator < 0 ? "" : path.slice(0, separator);
 }
 
-/** starter fixture 的可见 Workspace Files 人工验收区域。 */
+/** Visible Workspace Files acceptance fixture. */
 export function WorkspaceFilesTestPanel() {
 	const [path, setPath] = useState("workspace-manual/hello.txt");
 	const [text, setText] = useState(
 		"Hello from NoumiBridge.workspaceFiles",
 	);
 	const [entries, setEntries] = useState<Noumi.WorkspaceEntry[]>([]);
-	const [message, setMessage] = useState("尚未执行 Workspace Files 操作");
+	const [message, setMessage] = useState("No Workspace Files operation run yet");
 	const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const capabilities = window.NoumiBridge.workspaceFiles.capabilities;
 
-	/** 列出当前 path 的父目录，方便观察同目录 move/copy 结果。 */
+	/** List the current path's parent directory to inspect same-directory move/copy results. */
 	const refresh = useCallback(async (
 		options: { announce?: boolean } = {},
 	) => {
 		if (!capabilities.read) {
-			setMessage("当前成员没有 Workspace Files read 权限");
+			setMessage("The current member lacks Workspace Files read permission");
 			return;
 		}
 		const directory = parentDirectory(path);
@@ -49,14 +49,14 @@ export function WorkspaceFilesTestPanel() {
 			setEntries(page.entries);
 			if (options.announce !== false) {
 				setMessage(
-					`已列出 ${directory || "Workspace 根目录"} 的 ${page.entries.length} 个节点`,
+					`Listed ${page.entries.length} node(s) in ${directory || "Workspace root"}`,
 				);
 			}
 		} catch (error) {
 			setMessage(
 				error instanceof Error
 					? error.message
-					: "Workspace Files list 失败",
+					: "Workspace Files list failed",
 			);
 		}
 	}, [capabilities.read, path]);
@@ -65,7 +65,7 @@ export function WorkspaceFilesTestPanel() {
 		void refresh();
 	}, [refresh]);
 
-	/** 串行执行一次人工操作，并在成功后刷新父目录。 */
+	/** Run one fixture operation serially and refresh the parent directory after success. */
 	async function mutate(action: () => Promise<void>) {
 		setBusy(true);
 		setDownloadUrl(null);
@@ -77,25 +77,25 @@ export function WorkspaceFilesTestPanel() {
 			setMessage(
 				error instanceof Error
 					? error.message
-					: "Workspace Files 操作失败",
+					: "Workspace Files operation failed",
 			);
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 递归创建当前 path 的父目录。 */
+	/** Recursively create the parent directory of the current path. */
 	function createParentDirectory() {
 		const directory = parentDirectory(path);
 		if (!directory) {
-			setMessage("当前文件位于 Workspace 根目录，无需创建父目录");
+			setMessage("The current file is at the Workspace root; no parent directory is needed");
 			return;
 		}
 		void mutate(async () => {
 			const existing =
 				await window.NoumiBridge.workspaceFiles.stat(directory);
 			if (existing?.type === "file") {
-				throw new Error("父 path 已存在且不是目录");
+				throw new Error("The parent path exists and is not a directory");
 			}
 			const created = existing ??
 				await window.NoumiBridge.workspaceFiles.createDirectory(
@@ -104,13 +104,13 @@ export function WorkspaceFilesTestPanel() {
 				);
 			setMessage(
 				existing
-					? `目录 ${created.path} 已存在`
-					: `已创建目录 ${created.path}`,
+					? `Directory ${created.path} already exists`
+					: `Created directory ${created.path}`,
 			);
 		});
 	}
 
-	/** 新建文件或用 stat 返回的 node/etag 做一次并发安全覆盖。 */
+	/** Create a file or perform a concurrency-safe overwrite using the stat node/etag. */
 	function writeCurrent() {
 		void mutate(async () => {
 			const directory = parentDirectory(path);
@@ -118,7 +118,7 @@ export function WorkspaceFilesTestPanel() {
 				const parent =
 					await window.NoumiBridge.workspaceFiles.stat(directory);
 				if (parent?.type === "file") {
-					throw new Error("父 path 已存在且不是目录");
+					throw new Error("The parent path exists and is not a directory");
 				}
 				if (!parent) {
 					await window.NoumiBridge.workspaceFiles.createDirectory(
@@ -130,7 +130,7 @@ export function WorkspaceFilesTestPanel() {
 			const current =
 				await window.NoumiBridge.workspaceFiles.stat(path);
 			if (current?.type === "directory") {
-				throw new Error("当前 path 是目录，不能写入文本");
+				throw new Error("The current path is a directory and cannot receive text");
 			}
 			const written =
 				await window.NoumiBridge.workspaceFiles.writeFile(
@@ -149,12 +149,12 @@ export function WorkspaceFilesTestPanel() {
 						},
 				);
 			setMessage(
-				`已写入 ${written.path}（${written.size ?? 0} bytes）`,
+				`Wrote ${written.path} (${written.size ?? 0} bytes)`,
 			);
 		});
 	}
 
-	/** 严格按 UTF-8 读取当前文件。 */
+	/** Read the current file strictly as UTF-8. */
 	async function readCurrent() {
 		setBusy(true);
 		setDownloadUrl(null);
@@ -163,24 +163,24 @@ export function WorkspaceFilesTestPanel() {
 				await window.NoumiBridge.workspaceFiles.readTextFile(path);
 			setText(result.text);
 			setMessage(
-				`已读取 ${result.entry.path}（node ${result.entry.id}）`,
+				`Read ${result.entry.path} (node ${result.entry.id})`,
 			);
 		} catch (error) {
 			setMessage(
 				error instanceof Error
 					? error.message
-					: "Workspace Files read 失败",
+					: "Workspace Files read failed",
 			);
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 移动当前节点，并把表单切换到新 path。 */
+	/** Move the current node and switch the form to the new path. */
 	function moveCurrent() {
 		void mutate(async () => {
 			const current = await window.NoumiBridge.workspaceFiles.stat(path);
-			if (!current) throw new Error("当前 Workspace path 不存在");
+			if (!current) throw new Error("The current Workspace path does not exist");
 			const destinationPath = `${path}.moved`;
 			const moved = await window.NoumiBridge.workspaceFiles.move(
 				path,
@@ -194,15 +194,15 @@ export function WorkspaceFilesTestPanel() {
 					: { overwrite: true },
 			);
 			setPath(moved.path);
-			setMessage(`已移动到 ${moved.path}`);
+			setMessage(`Moved to ${moved.path}`);
 		});
 	}
 
-	/** 复制当前节点到显式新 path。 */
+	/** Copy the current node to an explicit new path. */
 	function copyCurrent() {
 		void mutate(async () => {
 			const current = await window.NoumiBridge.workspaceFiles.stat(path);
-			if (!current) throw new Error("当前 Workspace path 不存在");
+			if (!current) throw new Error("The current Workspace path does not exist");
 			const copied = await window.NoumiBridge.workspaceFiles.copy(
 				path,
 				`${path}.copy`,
@@ -214,17 +214,17 @@ export function WorkspaceFilesTestPanel() {
 					}
 					: { overwrite: true },
 			);
-			setMessage(`已复制到 ${copied.path}`);
+			setMessage(`Copied to ${copied.path}`);
 		});
 	}
 
-	/** 创建绑定当前 node/etag 的一次性短期下载 URL。 */
+	/** Create a short-lived download URL bound to the current node/etag. */
 	async function createDownload() {
 		setBusy(true);
 		try {
 			const current = await window.NoumiBridge.workspaceFiles.stat(path);
 			if (!current || current.type !== "file" || !current.etag) {
-				throw new Error("当前 Workspace path 不是可下载文件");
+				throw new Error("The current Workspace path is not a downloadable file");
 			}
 			const download =
 				await window.NoumiBridge.workspaceFiles.createDownloadUrl(
@@ -236,24 +236,24 @@ export function WorkspaceFilesTestPanel() {
 					},
 				);
 			setDownloadUrl(download.url);
-			setMessage(`下载 URL 有效至 ${download.expiresAt}`);
+			setMessage(`Download URL valid until ${download.expiresAt}`);
 		} catch (error) {
 			setMessage(
 				error instanceof Error
 					? error.message
-					: "创建 Workspace 下载 URL 失败",
+					: "Creating the Workspace download URL failed",
 			);
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	/** 删除当前节点；目录使用递归语义，Gateway 会复核整棵子树权限。 */
+	/** Delete the current node; directories use recursive semantics and the Gateway rechecks subtree access. */
 	function removeCurrent() {
 		void mutate(async () => {
 			const current = await window.NoumiBridge.workspaceFiles.stat(path);
 			if (!current) {
-				setMessage(`${path} 原本不存在`);
+				setMessage(`${path} did not exist`);
 				return;
 			}
 			const result = await window.NoumiBridge.workspaceFiles.remove(
@@ -269,7 +269,7 @@ export function WorkspaceFilesTestPanel() {
 				},
 			);
 			setMessage(
-				`已删除 ${result.path}（${result.removedNodeCount} 个节点）`,
+				`Deleted ${result.path} (${result.removedNodeCount} node(s))`,
 			);
 		});
 	}
@@ -281,11 +281,11 @@ export function WorkspaceFilesTestPanel() {
 					<FileText className="size-5" />
 				</div>
 				<div className="min-w-0">
-					<h2 className="font-semibold">Workspace Files 测试</h2>
+					<h2 className="font-semibold">Workspace Files Test</h2>
 					<p className="mt-1 text-sm leading-6 text-muted-foreground">
-						操作当前轻系统所属 Project 的协作文件；v1
-						不配置轻系统专属权限，只沿用当前成员正常的 Workspace
-						访问边界，文件内容继续进入 VFS 历史。
+						Operate on collaborative files in the Project owned by this Light System; v1
+						has no Light System-specific permissions and uses the current member's normal Workspace
+						access boundary, with file contents retained in VFS history.
 					</p>
 				</div>
 			</div>
@@ -300,7 +300,7 @@ export function WorkspaceFilesTestPanel() {
 					/>
 				</label>
 				<label className="grid gap-1 text-sm">
-					<span className="font-medium">UTF-8 文本内容</span>
+					<span className="font-medium">UTF-8 text content</span>
 					<textarea
 						className="min-h-24 resize-y rounded-md border bg-background px-3 py-2 outline-none ring-ring focus:ring-2"
 						onChange={(event) => setText(event.target.value)}
@@ -316,14 +316,14 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<FolderPlus data-icon="inline-start" />创建父目录
+					<FolderPlus data-icon="inline-start" />Create parent directory
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
 					onClick={writeCurrent}
 					type="button"
 				>
-					<FileUp data-icon="inline-start" />安全写入
+					<FileUp data-icon="inline-start" />Safe write
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read || !path}
@@ -331,7 +331,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<FolderOpen data-icon="inline-start" />读取文本
+					<FolderOpen data-icon="inline-start" />Read text
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read}
@@ -339,7 +339,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<RefreshCw data-icon="inline-start" />列出父目录
+					<RefreshCw data-icon="inline-start" />List parent directory
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
@@ -347,7 +347,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<MoveRight data-icon="inline-start" />移动
+					<MoveRight data-icon="inline-start" />Move
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
@@ -355,7 +355,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<Copy data-icon="inline-start" />复制
+					<Copy data-icon="inline-start" />Copy
 				</Button>
 				<Button
 					disabled={busy || !capabilities.read || !path}
@@ -363,7 +363,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="secondary"
 				>
-					<Download data-icon="inline-start" />下载 URL
+					<Download data-icon="inline-start" />Download URL
 				</Button>
 				<Button
 					disabled={busy || !capabilities.write || !path}
@@ -371,7 +371,7 @@ export function WorkspaceFilesTestPanel() {
 					type="button"
 					variant="destructive"
 				>
-					<Trash2 data-icon="inline-start" />删除
+					<Trash2 data-icon="inline-start" />Delete
 				</Button>
 			</div>
 
@@ -386,7 +386,7 @@ export function WorkspaceFilesTestPanel() {
 						href={downloadUrl}
 						rel="noreferrer"
 					>
-						下载 Workspace 文件
+						Download Workspace file
 					</a>
 				)}
 				<ul className="mt-3 grid gap-1 text-xs">
@@ -404,7 +404,7 @@ export function WorkspaceFilesTestPanel() {
 							</button>
 							<span className="shrink-0 text-muted-foreground">
 								{entry.type === "directory"
-									? "目录"
+									? "Directory"
 									: `${entry.size ?? 0} bytes`}
 							</span>
 						</li>

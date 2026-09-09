@@ -29,17 +29,17 @@ export class NoumiErrorBoundary extends Component<
 			<main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
 				<Card className="w-full max-w-xl space-y-4 p-6">
 					<div>
-						<p className="text-sm font-medium text-destructive">轻系统渲染失败</p>
-						<h1 className="mt-2 text-xl font-semibold">页面遇到了未恢复的错误</h1>
+						<p className="text-sm font-medium text-destructive">Light System render failed</p>
+						<h1 className="mt-2 text-xl font-semibold">The page encountered an unrecoverable error</h1>
 						<p className="mt-2 text-sm text-muted-foreground">
-							错误仍会显示在 DevTools，并已尝试提交给 Noumi diagnostics。
+							The error remains visible in DevTools, and Noumi diagnostics has been notified when possible.
 						</p>
 					</div>
 					<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs">
 						{this.state.error.message}
 					</pre>
 					<Button onClick={() => location.reload()} type="button">
-						重新加载
+						Reload
 					</Button>
 				</Card>
 			</main>

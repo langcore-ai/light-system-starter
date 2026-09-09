@@ -14,7 +14,7 @@ import { AppStorageTestPanel } from "./app-storage-test-panel";
 import { DiagnosticsTestPanel } from "./diagnostics-test-panel";
 import { WorkspaceFilesTestPanel } from "./workspace-files-test-panel";
 
-/** Starter migration 创建的共享任务行。 */
+/** Shared task row created by the starter migration. */
 type Task = {
 	id: string;
 	title: string;
@@ -23,27 +23,27 @@ type Task = {
 	created_at: string;
 };
 
-/** 把 SDK failure envelope 转成适合人工验收的短消息。 */
+/** Convert an SDK failure envelope into a concise fixture message. */
 function resultError(result: Noumi.DbFailure): string {
 	return `${result.error.code}: ${result.error.message}`;
 }
 
-/** 可人工验证 NoumiBridge 数据库与隔离 localStorage 的 starter 首页。 */
+/** Starter home page for manually verifying the NoumiBridge database and isolated localStorage. */
 export function App() {
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [title, setTitle] = useState("");
 	const [loading, setLoading] = useState(true);
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState("正在读取共享 SQLite…");
+	const [message, setMessage] = useState("Loading shared SQLite…");
 	const [localCount, setLocalCount] = useState(0);
-	const [sqlSummary, setSqlSummary] = useState<string>("SQL capability 未启用");
+	const [sqlSummary, setSqlSummary] = useState<string>("SQL capability is disabled");
 	const capabilities = window.NoumiBridge.db.capabilities;
 	const completed = useMemo(
 		() => tasks.filter((task) => task.completed).length,
 		[tasks],
 	);
 
-	/** 从专属 DO SQLite 重新读取任务，并可选运行一条 aggregate SQL。 */
+	/** Reload tasks from the dedicated DO SQLite and optionally run an aggregate SQL query. */
 	const loadTasks = useCallback(async () => {
 		setLoading(true);
 		try {
@@ -56,7 +56,7 @@ export function App() {
 				return;
 			}
 			setTasks(result.data);
-			setMessage(`已从共享 SQLite 读取 ${result.data.length} 条任务`);
+			setMessage(`Loaded ${result.data.length} task(s) from shared SQLite`);
 			if (capabilities.sqlQuery) {
 				const summary = await window.NoumiBridge.db.sql.query<{
 					total: number;
@@ -71,7 +71,7 @@ export function App() {
 				);
 			}
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "数据库 transport 失败");
+			setMessage(error instanceof Error ? error.message : "Database transport failed");
 		} finally {
 			setLoading(false);
 		}
@@ -81,10 +81,10 @@ export function App() {
 		void loadTasks();
 		void window.NoumiBridge.localStorage.getItem("starter-local-count")
 			.then((value) => setLocalCount(value ? Number(value) || 0 : 0))
-			.catch(() => setMessage("隔离 localStorage 读取失败"));
+			.catch(() => setMessage("Isolated localStorage read failed"));
 	}, [loadTasks]);
 
-	/** 串行执行一次 mutation，并在成功后刷新可见数据。 */
+	/** Run one mutation serially and refresh visible data after success. */
 	async function mutate(operation: () => Promise<Noumi.DbResult<unknown>>) {
 		setBusy(true);
 		try {
@@ -95,7 +95,7 @@ export function App() {
 			}
 			await loadTasks();
 		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "数据库 mutation transport 失败");
+			setMessage(error instanceof Error ? error.message : "Database mutation transport failed");
 		} finally {
 			setBusy(false);
 		}
@@ -139,41 +139,41 @@ export function App() {
 							<Database className="size-4" />
 							NoumiBridge database E2E
 						</div>
-						<h1 className="text-3xl font-bold tracking-tight">共享任务面板</h1>
+					<h1 className="text-3xl font-bold tracking-tight">Shared Tasks</h1>
 						<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-							任务写入当前轻系统独享的 Durable Object SQLite；右侧计数只写入与主前端隔离的异步 localStorage。
+							Tasks are stored in this Light System's dedicated Durable Object SQLite; the counter on the right uses async localStorage isolated from the main frontend.
 						</p>
 					</div>
 					<div className="shrink-0 rounded-xl bg-muted px-4 py-3 text-center">
 						<p className="text-2xl font-bold">{completed}/{tasks.length}</p>
-						<p className="text-xs text-muted-foreground">SQLite 已完成</p>
+						<p className="text-xs text-muted-foreground">SQLite completed</p>
 					</div>
 				</header>
 
-				<section className="grid gap-3 sm:grid-cols-3" aria-label="Bridge 状态">
+				<section className="grid gap-3 sm:grid-cols-3" aria-label="Bridge status">
 					<Card className="p-4">
-						<p className="text-xs text-muted-foreground">当前成员</p>
+						<p className="text-xs text-muted-foreground">Current member</p>
 						<p className="mt-1 truncate text-sm font-medium">
 							{window.NoumiBridge.currentMember?.displayName ??
 								window.NoumiBridge.currentMember?.email ??
-								"未登录"}
+								"Not signed in"}
 						</p>
 					</Card>
 					<Card className="p-4">
-						<p className="text-xs text-muted-foreground">数据库能力</p>
+						<p className="text-xs text-muted-foreground">Database capabilities</p>
 						<p className="mt-1 text-sm font-medium">
 							CRUD {capabilities.structuredCrud ? "ON" : "OFF"} · SQL{" "}
 							{capabilities.sqlQuery ? "ON" : "OFF"}
 						</p>
 					</Card>
 					<Card className="p-4">
-						<p className="text-xs text-muted-foreground">隔离本地计数</p>
+						<p className="text-xs text-muted-foreground">Isolated local count</p>
 						<button
 							className="mt-1 text-left text-sm font-medium text-primary"
 							onClick={() => void incrementLocalCount()}
 							type="button"
 						>
-							{localCount}（点击 +1）
+							{localCount} (click +1)
 						</button>
 					</Card>
 				</section>
@@ -187,18 +187,18 @@ export function App() {
 						}}
 					>
 						<input
-							aria-label="新任务"
+							aria-label="New task"
 							className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
 							disabled={busy || !capabilities.structuredCrud}
 							onChange={(event) => setTitle(event.target.value)}
-							placeholder="添加一条共享任务"
+							placeholder="Add a shared task"
 							value={title}
 						/>
 						<Button disabled={busy || !capabilities.structuredCrud} type="submit">
-							<Plus className="size-4" />添加
+							<Plus className="size-4" />Add
 						</Button>
 						<Button
-							aria-label="刷新数据库"
+							aria-label="Refresh database"
 							disabled={loading}
 							onClick={() => void loadTasks()}
 							size="icon"
@@ -210,11 +210,11 @@ export function App() {
 					</form>
 				</Card>
 
-				<section className="grid gap-3" aria-label="共享任务列表">
+				<section className="grid gap-3" aria-label="Shared task list">
 					{tasks.map((task) => (
 						<Card className="flex items-center gap-3 p-4" key={task.id}>
 							<button
-								aria-label={task.completed ? "标记为未完成" : "标记为完成"}
+								aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
 								className="shrink-0 text-primary"
 								disabled={busy}
 								onClick={() => void mutate(async () =>
@@ -236,7 +236,7 @@ export function App() {
 								<p className="text-xs text-muted-foreground">{task.created_at}</p>
 							</div>
 							<Button
-								aria-label="删除任务"
+								aria-label="Delete task"
 								disabled={busy}
 								onClick={() => void mutate(async () =>
 									await window.NoumiBridge.db.from<Task>("tasks")
@@ -253,7 +253,7 @@ export function App() {
 					))}
 					{!loading && tasks.length === 0 && (
 						<Card className="p-8 text-center text-sm text-muted-foreground">
-							数据库为空。添加一条任务后刷新页面，确认数据仍然存在。
+							No tasks yet. Add a task and refresh the page to confirm that the data persists.
 						</Card>
 					)}
 				</section>
