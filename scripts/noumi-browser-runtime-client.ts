@@ -74,6 +74,13 @@ type BridgeDatabaseResponse = {
 /** 页面级错误探针在业务 bundle 之前安装，bootstrap 前错误先进入有界队列。 */
 const diagnosticsReporter = new NoumiClientDiagnosticsReporter();
 
+// 原控制台输出保持不变；诊断自身不调用 console.error，避免递归。
+const originalConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+	originalConsoleError(...args);
+	diagnosticsReporter.captureConsoleError(args);
+};
+
 window.addEventListener("error", (event) => {
 	// 资源 error 不冒泡，必须使用捕获阶段；监听器只观察，不调用 preventDefault。
 	if (event.target && event.target !== window) {
@@ -252,8 +259,12 @@ addEventListener("message", (event) => {
 			return;
 		}
 		clearTimeout(bootstrapTimer);
-		diagnosticsReporter.setChannel(channelId);
+		diagnosticsReporter.setChannel(channelId, event.data.diagnosticsAcknowledgement === true);
 		bootstrapResolve(payload as BootstrapPayload);
+		return;
+	}
+	if (event.data.type === "noumi:light-system:bridge:diagnostics:ack" && typeof event.data.batchId === "string") {
+		diagnosticsReporter.acknowledgeBatch(event.data.batchId);
 		return;
 	}
 	if (

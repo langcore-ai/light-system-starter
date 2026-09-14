@@ -91,6 +91,7 @@ export type NoumiDiagnosticsBatchMessageV1 = {
 	batchId: string;
 	events: NoumiClientDiagnosticEventV1[];
 	droppedCount: number;
+	acknowledge?: boolean;
 };
 
 /** 资源加载错误所需的最小目标结构。 */
@@ -163,10 +164,9 @@ export function redactSensitiveDiagnosticText(value: string): string {
 			}
 		},
 	);
-	return withoutUrls.replace(
-		/\b(token|access_token|api_key|apikey|password|secret)=([^\s&]+)/gi,
-		"$1=[redacted]",
-	);
+	return withoutUrls
+		.replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]")
+		.replace(/(\b(?:token|access_token|api_key|apikey|password|secret|authorization|cookie)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s&,}]+)/gi, "$1[redacted]");
 }
 
 /**
@@ -397,6 +397,9 @@ export class NoumiClientDiagnosticsReporter {
 	private timer: ReturnType<typeof setTimeout> | null = null;
 	private hasFlushed = false;
 	private reporting = false;
+	private acknowledgement = false;
+	private capturingConsole = false;
+	private pendingBatch: { message: NoumiDiagnosticsBatchMessageV1; attempts: number } | null = null;
 
 	constructor(
 		dependencies: Partial<NoumiDiagnosticsReporterDependencies> = {},
@@ -405,10 +408,20 @@ export class NoumiClientDiagnosticsReporter {
 	}
 
 	/** Bridge bootstrap 成功后固定当前 channel，并尝试发送 bootstrap 前积压事件。 */
-	setChannel(channelId: string): void {
+	setChannel(channelId: string, acknowledgement = false): void {
 		if (!channelId || channelId.length > 128) return;
 		this.activeChannelId = channelId;
+		this.acknowledgement = acknowledgement;
 		if (this.queue.length > 0 || this.droppedCount > 0) this.scheduleFlush(0);
+	}
+
+	/** 父外壳接管批次后才释放；网络送达仍由外壳负责。 */
+	acknowledgeBatch(batchId: string): void {
+		if (this.pendingBatch?.message.batchId !== batchId) return;
+		this.pendingBatch = null;
+		if (this.timer !== null) this.dependencies.cancel(this.timer);
+		this.timer = null;
+		if (this.queue.length || this.droppedCount) this.scheduleFlush(0);
 	}
 
 	/** 公开主动上报入口；返回 void 且吞掉 reporter 自身错误。 */
@@ -418,6 +431,36 @@ export class NoumiClientDiagnosticsReporter {
 		} catch {
 			// diagnostics 永远不能改变业务 catch 路径。
 		}
+	}
+
+	/** console.error 复用手动错误协议；只读取有界自有数据属性，不调用 getter/toJSON。 */
+	captureConsoleError(args: readonly unknown[]): void {
+		if (this.capturingConsole) return;
+		this.capturingConsole = true;
+		try {
+			const preview = (value: unknown, depth: number): unknown => {
+				if (typeof value === "string") return truncateDiagnosticText(value, 512);
+				if (value === null || typeof value === "number" || typeof value === "boolean") return value;
+				if (value instanceof Error) return normalizeDiagnosticError(value).message;
+				if (typeof value !== "object" || depth === 0) return String(typeof value);
+				const result: Record<string, unknown> = Object.create(null);
+				for (const key of Object.keys(value).slice(0, 10)) {
+					if (/token|password|secret|authorization|cookie|api[_-]?key/i.test(key)) { result[key] = "[redacted]"; continue; }
+					const property = Object.getOwnPropertyDescriptor(value, key);
+					if (property && "value" in property) result[key] = preview(property.value, depth - 1);
+				}
+				return result;
+			};
+			const message = args.slice(0, 10).map((arg) => {
+				try { const value = preview(arg, 2); return typeof value === "string" ? value : JSON.stringify(value); }
+				catch { return "[unavailable]"; }
+			}).join(" ");
+			const error = new Error(truncateDiagnosticText(message || "console.error", NOUMI_DIAGNOSTICS_MESSAGE_MAX_BYTES));
+			const original = args.find((arg) => arg instanceof Error);
+			if (original) error.stack = normalizeDiagnosticError(original).stack ?? error.stack;
+			this.enqueue("manual", error, { operation: "console.error" }, null, null);
+		} catch { /* 控制台采集不能影响业务或原控制台输出。 */ }
+		finally { this.capturingConsole = false; }
 	}
 
 	/** 仅 starter 平台 Error Boundary 使用，可附带 React component stack。 */
@@ -518,7 +561,7 @@ export class NoumiClientDiagnosticsReporter {
 
 	/** 当前有界队列状态，仅测试 Runtime 背压，不暴露到公开 Bridge。 */
 	readStateForTest(): { queued: number; droppedCount: number } {
-		return { queued: this.queue.length, droppedCount: this.droppedCount };
+		return { queued: this.queue.length + (this.pendingBatch?.message.events.length ?? 0), droppedCount: this.droppedCount };
 	}
 
 	/** 规范化并加入有界队列。 */
@@ -533,7 +576,7 @@ export class NoumiClientDiagnosticsReporter {
 		if (this.reporting) return;
 		this.reporting = true;
 		try {
-			if (this.queue.length >= NOUMI_DIAGNOSTICS_QUEUE_MAX) {
+			if (this.queue.length + (this.pendingBatch?.message.events.length ?? 0) >= NOUMI_DIAGNOSTICS_QUEUE_MAX) {
 				this.droppedCount += 1;
 				return;
 			}
@@ -587,6 +630,7 @@ export class NoumiClientDiagnosticsReporter {
 			this.dependencies.cancel(this.timer);
 			this.timer = null;
 		}
+		if (this.pendingBatch && !this.sendPendingBatch()) return;
 		while (this.queue.length > 0 || this.droppedCount > 0) {
 			const events: NoumiClientDiagnosticEventV1[] = [];
 			const batchId = this.dependencies.randomId();
@@ -625,9 +669,30 @@ export class NoumiClientDiagnosticsReporter {
 				this.droppedCount += events.length;
 				continue;
 			}
-			this.dependencies.postBatch(message);
+			if (this.acknowledgement) message.acknowledge = true;
+			this.pendingBatch = { message, attempts: 0 };
 			this.droppedCount = 0;
 			this.hasFlushed = true;
+			if (!this.sendPendingBatch()) return;
 		}
+	}
+
+	/** 使用同一批次 ID 有限重试；不制造诊断异常递归，也不无限占用页面内存。 */
+	private sendPendingBatch(): boolean {
+		const pending = this.pendingBatch;
+		if (!pending) return true;
+		if (pending.attempts >= 3) {
+			this.droppedCount += pending.message.events.length + pending.message.droppedCount;
+			this.pendingBatch = null;
+			if (this.queue.length) this.scheduleFlush(0);
+			return false;
+		}
+		pending.attempts += 1;
+		try {
+			this.dependencies.postBatch(pending.message);
+			if (!this.acknowledgement) { this.pendingBatch = null; return true; }
+		} catch { /* 保留批次等待下次发送。 */ }
+		this.scheduleFlush(5_000);
+		return false;
 	}
 }
