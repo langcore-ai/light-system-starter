@@ -1,3 +1,5 @@
+import { createNoumiRequestId } from "./noumi-request-id";
+
 /** 外部数据库 Browser/Gateway 协议版本。 */
 export const NOUMI_OUTSIDE_DB_PROTOCOL_VERSION = 1 as const;
 
@@ -413,7 +415,7 @@ export function createNoumiOutsideDb(
 					throw new TypeError("External database timeout is invalid");
 				}
 				if (!frozenCapabilities.available) {
-					const requestId = crypto.randomUUID();
+					const requestId = createNoumiRequestId();
 					return {
 						version: NOUMI_OUTSIDE_DB_PROTOCOL_VERSION,
 						ok: false,

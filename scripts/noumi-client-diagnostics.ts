@@ -1,3 +1,5 @@
+import { createNoumiRequestId } from "./noumi-request-id";
+
 /** iframe 向可信父外壳发送的单向 diagnostics 消息类型。 */
 export const NOUMI_DIAGNOSTICS_MESSAGE =
 	"noumi:light-system:bridge:diagnostics";
@@ -128,7 +130,7 @@ type NormalizedError = {
 function createDefaultDependencies(): NoumiDiagnosticsReporterDependencies {
 	return {
 		now: () => new Date(),
-		randomId: () => crypto.randomUUID(),
+		randomId: createNoumiRequestId,
 		schedule: (callback, delayMs) => setTimeout(callback, delayMs),
 		cancel: (timer) => clearTimeout(timer),
 		postBatch: (message) => window.parent.postMessage(message, "*"),

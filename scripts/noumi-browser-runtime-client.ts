@@ -1,3 +1,4 @@
+import { createNoumiRequestId } from "./noumi-request-id";
 import {
 	createNoumiDatabase,
 	type NoumiDbCapabilities,
@@ -328,7 +329,7 @@ function call(
 ): Promise<unknown> {
 	return new Promise((resolve, reject) => {
 		// UUID 避免同一 Light System 的多成员、多 tab 在同一毫秒产生碰撞。
-		const requestId = crypto.randomUUID();
+		const requestId = createNoumiRequestId();
 		const cancelMethod = method === "appStorage.request"
 			? "appStorage.cancel"
 			: method === "workspaceFiles.request"
@@ -362,7 +363,7 @@ function call(
 					type: BRIDGE_REQUEST_MESSAGE,
 					version: BRIDGE_VERSION,
 					channelId,
-					requestId: crypto.randomUUID(),
+					requestId: createNoumiRequestId(),
 					method: cancelMethod,
 					params: { requestId },
 				}, "*");
@@ -382,7 +383,7 @@ function call(
 					type: BRIDGE_REQUEST_MESSAGE,
 					version: BRIDGE_VERSION,
 					channelId,
-					requestId: crypto.randomUUID(),
+					requestId: createNoumiRequestId(),
 					method: cancelMethod,
 					params: { requestId },
 				}, "*");

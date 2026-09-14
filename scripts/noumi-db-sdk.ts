@@ -1,3 +1,5 @@
+import { createNoumiRequestId } from "./noumi-request-id";
+
 /** Noumi DB v1 的虚拟 origin；SDK 不会直接对它发起网络请求。 */
 export const NOUMI_DB_VIRTUAL_ORIGIN = "https://db.noumi.invalid";
 
@@ -638,7 +640,7 @@ class FluentExecutable<Result> extends ExecutableBuilder<Result> {
 	}
 
 	async createPromise(options?: NoumiExecuteOptions): Promise<Result> {
-		const operationId = this.mutation ? crypto.randomUUID() : null;
+		const operationId = this.mutation ? createNoumiRequestId() : null;
 		return await executeRequest(
 			this.transport,
 			createFluentRequest(this.state, operationId),
@@ -1212,7 +1214,7 @@ export function createNoumiDatabase(
 				bindings: readonly NoumiDbScalar[] = [],
 				options?: NoumiSqlExecuteOptions,
 			): Promise<NoumiDbResult<Row[] | null>> {
-				const operationId = crypto.randomUUID();
+				const operationId = createNoumiRequestId();
 				const request = createSqlRequest(
 					"execute",
 					statement,
