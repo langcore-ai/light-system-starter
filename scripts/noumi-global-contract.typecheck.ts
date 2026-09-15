@@ -239,3 +239,7 @@ type _WorkspaceContractMatches = AssertEquivalent<
 type _OutsideDatabaseContractMatches = AssertEquivalent<
 	IsEquivalent<GlobalOutsideDatabaseContract, RuntimeOutsideDatabaseContract>
 >;
+
+/** HTTP 类型必须与真实 Browser Runtime 保持双向兼容。 */
+type HttpRequestContract = AssertEquivalent<IsEquivalent<Noumi.HttpRequest, import("./noumi-browser-runtime-client").NoumiHttpRequest>>;
+type HttpResponseContract = AssertEquivalent<IsEquivalent<Noumi.HttpResponse, import("./noumi-browser-runtime-client").NoumiHttpResponse>>;

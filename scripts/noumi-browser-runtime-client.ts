@@ -23,6 +23,11 @@ import {
 	type NoumiOutsideDbTransport,
 } from "./noumi-outside-db";
 
+/** HTTP 请求参数；正文是 UTF-8 文本，外部认证 header 必须显式传入。 */
+export type NoumiHttpRequest = { url: string; method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS"; headers?: Record<string, string>; body?: string; timeoutMs?: number };
+/** HTTP 响应同时保留文本和解码传输压缩后的二进制 base64 表示。 */
+export type NoumiHttpResponse = { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyBase64: string };
+
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
 
@@ -535,6 +540,18 @@ const bridge = Object.freeze({
 			}) === true;
 		},
 	}),
+	http: Object.freeze({
+    /** 将请求交给可信外壳；不会在轻系统浏览器内发起外部 fetch。 */
+    async request(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
+      // 在结构化克隆之前限制完整 wire，避免超大正文先进入父外壳。
+      const payload = JSON.stringify(input);
+      if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
+      const result = await call("http.request", input, undefined, 40_000) as { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyEncoding: string };
+      if (!result || result.bodyEncoding !== "base64" || typeof result.body !== "string" || !Number.isInteger(result.status) || !Array.isArray(result.headers)) throw new TypeError("Invalid HTTP Bridge response");
+      const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
+      return { status: result.status, statusText: result.statusText, headers: result.headers, body: new TextDecoder().decode(bytes), bodyBase64: result.body };
+    },
+  }),
 	appStorage: createNoumiAppStorage(
 		appStorageTransport,
 		payload.appStorageCapabilities,

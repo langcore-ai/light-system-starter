@@ -481,6 +481,27 @@ type OutsideDbTransportError = Error & {
 	readonly outcome: "not-sent" | "unknown";
 };
 
+/** 后端代理 HTTP 请求；仅支持公网 HTTP(S)，不继承平台 Cookie。 */
+type HttpRequest = {
+  url: string;
+  method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  headers?: Record<string, string>;
+  /** UTF-8 正文；JSON 需由调用方 stringify。 */
+  body?: string;
+  /** 默认 30000，允许 100–30000 毫秒。 */
+  timeoutMs?: number;
+};
+/** 外部响应；4xx/5xx 原样返回，传输错误 reject 且不能假定未产生副作用。 */
+type HttpResponse = {
+  status: number;
+  statusText: string;
+  headers: Array<[string, string]>;
+  /** 响应正文按 UTF-8 解码；JSON 可使用 JSON.parse(body)。 */
+  body: string;
+  /** 解码 HTTP 传输压缩后的正文 base64，供二进制内容使用。 */
+  bodyBase64: string;
+};
+
 // Bridge
 interface MemberInfo {
 	email: string;
@@ -504,6 +525,8 @@ interface Bridge {
 		keys(): Promise<string[]>;
 		has(key: string): Promise<boolean>;
 	};
+	/** 通过可信外壳和平台后端发起外部请求，不自动重试或跟随重定向。 */
+	readonly http: { request(input: HttpRequest): Promise<HttpResponse> };
 	readonly appStorage: AppStorage;
 	readonly workspaceFiles: WorkspaceFiles;
 	readonly outsideDb: OutsideDbFactory;
