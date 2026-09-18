@@ -540,16 +540,16 @@ const bridge = Object.freeze({
 			}) === true;
 		},
 	}),
+	interfaces: Object.freeze({
+    /** 仅传操作名和业务参数；认证值始终由平台解析。 */
+    async invoke(name: string, input: Record<string, string | number | boolean | null> = {}): Promise<NoumiHttpResponse> {
+      return await requestHttpCapability("interfaces.invoke", { name: requireString(name, "name"), input });
+    },
+  }),
 	http: Object.freeze({
     /** 将请求交给可信外壳；不会在轻系统浏览器内发起外部 fetch。 */
     async request(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
-      // 在结构化克隆之前限制完整 wire，避免超大正文先进入父外壳。
-      const payload = JSON.stringify(input);
-      if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
-      const result = await call("http.request", input, undefined, 40_000) as { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyEncoding: string };
-      if (!result || result.bodyEncoding !== "base64" || typeof result.body !== "string" || !Number.isInteger(result.status) || !Array.isArray(result.headers)) throw new TypeError("Invalid HTTP Bridge response");
-      const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
-      return { status: result.status, statusText: result.statusText, headers: result.headers, body: new TextDecoder().decode(bytes), bodyBase64: result.body };
+      return await requestHttpCapability("http.request", input);
     },
   }),
 	appStorage: createNoumiAppStorage(
@@ -566,6 +566,16 @@ const bridge = Object.freeze({
 	),
 	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
 });
+
+/** 复用 HTTP wire、大小限制和二进制解码，普通请求与命名接口保持一致。 */
+async function requestHttpCapability(method: string, input: unknown): Promise<NoumiHttpResponse> {
+  const payload = JSON.stringify(input);
+  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
+  const result = await call(method, input, undefined, 40_000) as { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyEncoding: string };
+  if (!result || result.bodyEncoding !== "base64" || typeof result.body !== "string" || !Number.isInteger(result.status) || !Array.isArray(result.headers)) throw new TypeError("Invalid HTTP Bridge response");
+  const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
+  return { status: result.status, statusText: result.statusText, headers: result.headers, body: new TextDecoder().decode(bytes), bodyBase64: result.body };
+}
 
 Object.defineProperty(window, "NoumiBridge", {
 	value: bridge,

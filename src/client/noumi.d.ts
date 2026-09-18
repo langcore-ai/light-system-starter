@@ -527,6 +527,8 @@ interface Bridge {
 	};
 	/** 通过可信外壳和平台后端发起外部请求，不自动重试或跟随重定向。 */
 	readonly http: { request(input: HttpRequest): Promise<HttpResponse> };
+	/** 调用源码声明的固定接口；秘密由服务端注入，输入只允许声明的标量参数。 */
+	readonly interfaces: { invoke(name: string, input?: Record<string, string | number | boolean | null>): Promise<HttpResponse> };
 	readonly appStorage: AppStorage;
 	readonly workspaceFiles: WorkspaceFiles;
 	readonly outsideDb: OutsideDbFactory;
