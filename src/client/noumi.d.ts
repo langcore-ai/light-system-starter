@@ -481,15 +481,34 @@ type OutsideDbTransportError = Error & {
 	readonly outcome: "not-sent" | "unknown";
 };
 
-/** 后端代理 HTTP 请求；仅支持公网 HTTP(S)，不继承平台 Cookie。 */
+/** 项目管理员管理的不可变 Secret 名称；仅服务端解析，轮换在下一次请求生效，无需发布。 */
+type HttpSecretReference = { $secret: string; prefix?: string };
+type HttpValue = string | HttpSecretReference;
+/** JSON 可递归包含 Secret 引用；不支持任意模板插值。 */
+type HttpJson = null | boolean | number | string | HttpSecretReference | HttpJson[] | { [key: string]: HttpJson };
+/** 四种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
+type HttpBody =
+  | { body?: string; json?: never; form?: never; text?: never }
+  | { body?: never; json: HttpJson; form?: never; text?: never }
+  | { body?: never; json?: never; form: Record<string, HttpValue>; text?: never }
+  | { body?: never; json?: never; form?: never; text: HttpValue[] };
+/** 后端代理公网 HTTP(S)；Secret 仅发往管理员授权的精确 HTTPS origin，不继承平台 Cookie。 */
 type HttpRequest = {
   url: string;
   method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  headers?: Record<string, string>;
-  /** UTF-8 正文；JSON 需由调用方 stringify。 */
-  body?: string;
+  headers?: Record<string, HttpValue>;
+  query?: Record<string, HttpValue>;
+  /** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
+  pathSegments?: HttpValue[];
   /** 默认 30000，允许 100–30000 毫秒。 */
   timeoutMs?: number;
+} & HttpBody;
+/** 平台 HTTP 错误；catch 后按 code/outcome 等属性收窄，unknown 不得自动重试。 */
+type HttpError = Error & {
+  readonly code: string;
+  readonly secretName?: string;
+  readonly requiredPermission?: "project-admin";
+  readonly outcome: "not-sent" | "unknown";
 };
 /** 外部响应；4xx/5xx 原样返回，传输错误 reject 且不能假定未产生副作用。 */
 type HttpResponse = {
@@ -527,8 +546,6 @@ interface Bridge {
 	};
 	/** 通过可信外壳和平台后端发起外部请求，不自动重试或跟随重定向。 */
 	readonly http: { request(input: HttpRequest): Promise<HttpResponse> };
-	/** 调用源码声明的固定接口；秘密由服务端注入，输入只允许声明的标量参数。 */
-	readonly interfaces: { invoke(name: string, input?: Record<string, string | number | boolean | null>): Promise<HttpResponse> };
 	readonly appStorage: AppStorage;
 	readonly workspaceFiles: WorkspaceFiles;
 	readonly outsideDb: OutsideDbFactory;

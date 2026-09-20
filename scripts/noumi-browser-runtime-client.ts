@@ -23,10 +23,50 @@ import {
 	type NoumiOutsideDbTransport,
 } from "./noumi-outside-db";
 
-/** HTTP 请求参数；正文是 UTF-8 文本，外部认证 header 必须显式传入。 */
-export type NoumiHttpRequest = { url: string; method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS"; headers?: Record<string, string>; body?: string; timeoutMs?: number };
+/** 项目管理员管理的不可变 Secret 名称；仅服务端解析，轮换在下一次请求生效，无需发布。 */
+export type NoumiHttpSecretReference = { $secret: string; prefix?: string };
+export type NoumiHttpValue = string | NoumiHttpSecretReference;
+/** JSON 可递归包含 Secret 引用；不支持任意模板插值。 */
+export type NoumiHttpJson =
+  | null
+  | boolean
+  | number
+  | string
+  | NoumiHttpSecretReference
+  | NoumiHttpJson[]
+  | { [key: string]: NoumiHttpJson };
+/** 四种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
+export type NoumiHttpBody =
+  | { body?: string; json?: never; form?: never; text?: never }
+  | { body?: never; json: NoumiHttpJson; form?: never; text?: never }
+  | { body?: never; json?: never; form: Record<string, NoumiHttpValue>; text?: never }
+  | { body?: never; json?: never; form?: never; text: NoumiHttpValue[] };
+/** 后端代理公网 HTTP(S)；Secret 仅发往管理员授权的精确 HTTPS origin，不继承平台 Cookie。 */
+export type NoumiHttpRequest = {
+  url: string;
+  method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+  headers?: Record<string, NoumiHttpValue>;
+  query?: Record<string, NoumiHttpValue>;
+  /** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
+  pathSegments?: NoumiHttpValue[];
+  /** 默认 30000，允许 100–30000 毫秒。 */
+  timeoutMs?: number;
+} & NoumiHttpBody;
+/** 平台 HTTP 错误；catch 后按 code/outcome 等属性收窄，unknown 不得自动重试。 */
+export type NoumiHttpError = Error & {
+  readonly code: string;
+  readonly secretName?: string;
+  readonly requiredPermission?: "project-admin";
+  readonly outcome: "not-sent" | "unknown";
+};
 /** HTTP 响应同时保留文本和解码传输压缩后的二进制 base64 表示。 */
-export type NoumiHttpResponse = { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyBase64: string };
+export type NoumiHttpResponse = {
+  status: number;
+  statusText: string;
+  headers: Array<[string, string]>;
+  body: string;
+  bodyBase64: string;
+};
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
 const BRIDGE_VERSION = 1;
@@ -540,16 +580,10 @@ const bridge = Object.freeze({
 			}) === true;
 		},
 	}),
-	interfaces: Object.freeze({
-    /** 仅传操作名和业务参数；认证值始终由平台解析。 */
-    async invoke(name: string, input: Record<string, string | number | boolean | null> = {}): Promise<NoumiHttpResponse> {
-      return await requestHttpCapability("interfaces.invoke", { name: requireString(name, "name"), input });
-    },
-  }),
 	http: Object.freeze({
     /** 将请求交给可信外壳；不会在轻系统浏览器内发起外部 fetch。 */
     async request(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
-      return await requestHttpCapability("http.request", input);
+      return await requestHttpCapability(input);
     },
   }),
 	appStorage: createNoumiAppStorage(
@@ -567,14 +601,55 @@ const bridge = Object.freeze({
 	db: createNoumiDatabase(databaseTransport, payload.databaseCapabilities),
 });
 
-/** 复用 HTTP wire、大小限制和二进制解码，普通请求与命名接口保持一致。 */
-async function requestHttpCapability(method: string, input: unknown): Promise<NoumiHttpResponse> {
+/** 发送结构化 HTTP wire 并校验大小，响应统一按 base64 解码。 */
+async function requestHttpCapability(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
   const payload = JSON.stringify(input);
-  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
-  const result = await call(method, input, undefined, 40_000) as { status: number; statusText: string; headers: Array<[string, string]>; body: string; bodyEncoding: string };
-  if (!result || result.bodyEncoding !== "base64" || typeof result.body !== "string" || !Number.isInteger(result.status) || !Array.isArray(result.headers)) throw new TypeError("Invalid HTTP Bridge response");
+  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024)
+    throw new TypeError("HTTP request exceeds limit");
+  const response = await call("http.request", input, undefined, 40_000);
+  if (isRecord(response) && "httpError" in response) {
+    const failure = response.httpError;
+    if (
+      !isRecord(failure) ||
+      typeof failure.code !== "string" ||
+      !/^(?:NOUMI_[A-Z0-9_]{1,100}|project_secret_[a-z_]{1,100})$/.test(failure.code) ||
+      (failure.outcome !== "not-sent" && failure.outcome !== "unknown")
+    ) {
+      throw new TypeError("Invalid HTTP Bridge response");
+    }
+    const error: NoumiHttpError = Object.assign(new Error(failure.code), {
+      code: failure.code,
+      outcome: failure.outcome,
+      ...(typeof failure.secretName === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(failure.secretName)
+        ? { secretName: failure.secretName }
+        : {}),
+      ...(failure.requiredPermission === "project-admin" ? { requiredPermission: "project-admin" as const } : {}),
+    } as const);
+    throw error;
+  }
+  const result = response as {
+    status: number;
+    statusText: string;
+    headers: Array<[string, string]>;
+    body: string;
+    bodyEncoding: string;
+  };
+  if (
+    !result ||
+    result.bodyEncoding !== "base64" ||
+    typeof result.body !== "string" ||
+    !Number.isInteger(result.status) ||
+    !Array.isArray(result.headers)
+  )
+    throw new TypeError("Invalid HTTP Bridge response");
   const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
-  return { status: result.status, statusText: result.statusText, headers: result.headers, body: new TextDecoder().decode(bytes), bodyBase64: result.body };
+  return {
+    status: result.status,
+    statusText: result.statusText,
+    headers: result.headers,
+    body: new TextDecoder().decode(bytes),
+    bodyBase64: result.body,
+  };
 }
 
 Object.defineProperty(window, "NoumiBridge", {
