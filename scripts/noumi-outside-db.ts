@@ -107,7 +107,7 @@ export type NoumiOutsideDbResult<
 	Row extends NoumiOutsideDbRow = NoumiOutsideDbRow,
 > = NoumiOutsideDbSuccess<Row> | NoumiOutsideDbFailure;
 
-/** 单条用户私有外部数据库引用。 */
+/** 单条项目共享外部数据库引用。 */
 export interface NoumiOutsideDatabase {
 	/**
 	 * 在目标数据库原生语义下执行完整 SQL。
