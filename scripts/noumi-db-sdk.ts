@@ -1046,13 +1046,14 @@ class TableRef<Row extends object> implements NoumiTableRef<Row> {
 	}
 }
 
-/** 扫描 SQL placeholder，同时忽略字符串、quoted identifier 和 comment。 */
+/** 扫描单条 SQL 的 placeholder；分号只在未引用、未注释时终止语句。 */
 function inspectSqlPlaceholders(statement: string): {
 	anonymousCount: number;
 	hasUnsupported: boolean;
 } {
 	let anonymousCount = 0;
 	let hasUnsupported = false;
+	let terminated = false;
 	let state: "code" | "single" | "double" | "backtick" | "bracket" | "line" | "block" =
 		"code";
 	for (let index = 0; index < statement.length; index += 1) {
@@ -1078,7 +1079,7 @@ function inspectSqlPlaceholders(statement: string): {
 			continue;
 		}
 		if (state === "line") {
-			if (character === "\n" || character === "\r") state = "code";
+			if (character === "\n") state = "code";
 			continue;
 		}
 		if (state === "block") {
@@ -1088,17 +1089,28 @@ function inspectSqlPlaceholders(statement: string): {
 			}
 			continue;
 		}
+		if (/\s/.test(character)) continue;
+		if (character === "-" && next === "-") {
+			index += 1;
+			state = "line";
+			continue;
+		}
+		if (character === "/" && next === "*") {
+			index += 1;
+			state = "block";
+			continue;
+		}
+		// 终止符后只能出现注释和空白，完整语法与授权仍由服务端 SQLite 判断。
+		if (terminated) return { anonymousCount, hasUnsupported: true };
+		if (character === ";") {
+			terminated = true;
+			continue;
+		}
 		if (character === "'") state = "single";
 		else if (character === '"') state = "double";
 		else if (character === "`") state = "backtick";
 		else if (character === "[") state = "bracket";
-		else if (character === "-" && next === "-") {
-			index += 1;
-			state = "line";
-		} else if (character === "/" && next === "*") {
-			index += 1;
-			state = "block";
-		} else if (character === "?") {
+		else if (character === "?") {
 			if (next !== undefined && /[0-9]/.test(next)) hasUnsupported = true;
 			else anonymousCount += 1;
 		} else if (
@@ -1120,7 +1132,6 @@ function normalizeSql(
 	if (
 		typeof statement !== "string" ||
 		statement.trim().length === 0 ||
-		statement.includes(";") ||
 		statement.includes("\0") ||
 		new TextEncoder().encode(statement).byteLength > MAX_SQL_BYTES
 	) {
@@ -1134,7 +1145,7 @@ function normalizeSql(
 	if (placeholders.hasUnsupported) {
 		throw clientError(
 			"NOUMI_DB_SQL_INVALID",
-			"only anonymous positional placeholders are supported",
+			"SQL requires one statement with anonymous positional placeholders",
 		);
 	}
 	if (placeholders.anonymousCount !== normalizedBindings.length) {
