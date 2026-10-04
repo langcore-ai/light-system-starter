@@ -24,6 +24,8 @@ export type NoumiDbCapabilities = {
 	structuredCrud: boolean;
 	sqlQuery: boolean;
 	sqlExecute: boolean;
+	/** 单请求、多语句共同提交能力。 */
+	sqlTransaction: boolean;
 	operationRecovery: boolean;
 };
 
@@ -97,6 +99,23 @@ export type NoumiSqlExecuteOptions = {
 	allowFullTable?: boolean;
 	signal?: AbortSignal;
 };
+
+/** 引用同一事务内先前步骤的一行标量结果；不传递 SQL 片段。 */
+export type NoumiSqlResultReference = { $result: { step: number; row: number; column: string } };
+
+/** 每项仍是一条参数化 SQL，query 可以读取本事务前序写入。 */
+export type NoumiSqlTransactionStatement = {
+	intent: "query" | "execute";
+	statement: string;
+	bindings?: readonly (NoumiDbScalar | NoumiSqlResultReference)[];
+	allowFullTable?: boolean;
+};
+
+/** 按输入顺序返回结果；没有 RETURNING 的成功写入 data 为 null。 */
+export type NoumiSqlTransactionStepResult = { data: NoumiDbRow[] | null; count: number };
+
+/** operationId 供同一请求整体重试；不得更换语句或调用者。 */
+export type NoumiSqlTransactionOptions = { signal?: AbortSignal; operationId?: string };
 
 /** SDK transport seam；Browser Runtime 在这里转入 Bridge。 */
 export type NoumiDbTransport = (
@@ -213,6 +232,10 @@ export interface NoumiTableRef<Row extends object> {
 
 /** SQL API。 */
 export interface NoumiSql {
+	transaction(
+		statements: readonly NoumiSqlTransactionStatement[],
+		options?: NoumiSqlTransactionOptions,
+	): Promise<NoumiDbResult<NoumiSqlTransactionStepResult[]>>;
 	query<Row extends object = NoumiDbRow>(
 		statement: string,
 		bindings?: readonly NoumiDbScalar[],
@@ -295,6 +318,9 @@ const MAX_SQL_BYTES = 64 * 1024;
 /** 单次 SQL 最大 binding 数。 */
 const MAX_SQL_BINDINGS = 100;
 
+/** 单请求共同提交的语句数上限；不等同于受影响行数。 */
+const MAX_SQL_TRANSACTION_STATEMENTS = 100;
+
 /** 单个 fluent Request 的结构预算。 */
 const FLUENT_LIMITS = {
 	bodyBytes: 256 * 1024,
@@ -312,6 +338,7 @@ const UNAVAILABLE_CAPABILITIES: Readonly<NoumiDbCapabilities> = Object.freeze({
 	structuredCrud: false,
 	sqlQuery: false,
 	sqlExecute: false,
+	sqlTransaction: false,
 	operationRecovery: false,
 });
 
@@ -1182,6 +1209,81 @@ function createSqlRequest(
 	});
 }
 
+/** 在发送前检查引用与单语句封套，快照输入避免调用者异步修改请求。 */
+function createSqlTransactionRequest(
+	statements: readonly NoumiSqlTransactionStatement[],
+	operationId: string,
+): Request {
+	if (
+		!Array.isArray(statements) ||
+		statements.length < 1 ||
+		statements.length > MAX_SQL_TRANSACTION_STATEMENTS
+	) {
+		throw clientError("NOUMI_DB_LIMIT_EXCEEDED", "SQL transaction requires 1 to 100 statements");
+	}
+	let hasMutation = false;
+	const normalized = statements.map((step, index) => {
+		if (
+			!step ||
+			(step.intent !== "query" && step.intent !== "execute") ||
+			(step.allowFullTable !== undefined && typeof step.allowFullTable !== "boolean") ||
+			(step.intent === "query" && step.allowFullTable === true)
+		) {
+			throw clientError("NOUMI_DB_INVALID_REQUEST", "SQL transaction statement is invalid");
+		}
+		hasMutation ||= step.intent === "execute";
+		const inputBindings = step.bindings ?? [];
+		if (!Array.isArray(inputBindings) || inputBindings.length > MAX_SQL_BINDINGS) {
+			throw clientError("NOUMI_DB_LIMIT_EXCEEDED", "SQL bindings exceed the limit");
+		}
+		const bindings = inputBindings.map((value) => {
+			if (value === null || typeof value !== "object") return normalizeScalar(value);
+			const ref = value.$result;
+			if (
+				Object.keys(value).length !== 1 ||
+				!ref ||
+				typeof ref !== "object" ||
+				Object.keys(ref).length !== 3 ||
+				!Number.isSafeInteger(ref.step) ||
+				ref.step < 0 ||
+				ref.step >= index ||
+				!Number.isSafeInteger(ref.row) ||
+				ref.row < 0 ||
+				typeof ref.column !== "string" ||
+				ref.column.length === 0
+			) {
+				throw clientError(
+					"NOUMI_DB_INVALID_REQUEST",
+					"SQL result reference must point to an earlier step",
+				);
+			}
+			return { $result: { step: ref.step, row: ref.row, column: ref.column } };
+		});
+		// 引用只替代标量占位符，语法扫描始终沿用单条 SQL 的同一个规则。
+		const sql = normalizeSql(
+			step.statement,
+			bindings.map((value) => (typeof value === "object" ? null : value)),
+		);
+		return {
+			intent: step.intent,
+			statement: sql.statement,
+			bindings,
+			allowFullTable: step.allowFullTable === true,
+		};
+	});
+	if (!hasMutation)
+		throw clientError("NOUMI_DB_INVALID_REQUEST", "SQL transaction requires a mutation");
+	return new Request(`${NOUMI_DB_VIRTUAL_ORIGIN}/v1/sql/transaction`, {
+		method: "POST",
+		headers: {
+			accept: "application/json",
+			"content-type": "application/json",
+			"x-noumi-db-operation-id": operationId,
+		},
+		body: JSON.stringify({ statements: normalized }),
+	});
+}
+
 /** 创建浏览器公开 Noumi DB SDK。 */
 export function createNoumiDatabase(
 	transport: NoumiDbTransport,
@@ -1195,6 +1297,7 @@ export function createNoumiDatabase(
 		typeof capabilities.structuredCrud !== "boolean" ||
 		typeof capabilities.sqlQuery !== "boolean" ||
 		typeof capabilities.sqlExecute !== "boolean" ||
+		typeof capabilities.sqlTransaction !== "boolean" ||
 		typeof capabilities.operationRecovery !== "boolean"
 	) {
 		throw new TypeError("Noumi database capabilities are invalid");
@@ -1206,6 +1309,20 @@ export function createNoumiDatabase(
 			return new TableRef<Row>(transport, table);
 		},
 		sql: Object.freeze({
+			async transaction(
+				statements: readonly NoumiSqlTransactionStatement[],
+				options?: NoumiSqlTransactionOptions,
+			): Promise<NoumiDbResult<NoumiSqlTransactionStepResult[]>> {
+				const operationId = options?.operationId ?? createNoumiRequestId();
+				if (!UUID_PATTERN.test(operationId))
+					throw clientError("NOUMI_DB_INVALID_REQUEST", "operationId is invalid");
+				return await executeRequest<NoumiSqlTransactionStepResult[]>(
+					transport,
+					createSqlTransactionRequest(statements, operationId),
+					options,
+					operationId,
+				);
+			},
 			async query<Row extends object = NoumiDbRow>(
 				statement: string,
 				bindings: readonly NoumiDbScalar[] = [],

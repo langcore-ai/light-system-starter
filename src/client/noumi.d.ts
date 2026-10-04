@@ -21,6 +21,7 @@ type DbCapabilities = {
 	structuredCrud: boolean;
 	sqlQuery: boolean;
 	sqlExecute: boolean;
+	sqlTransaction: boolean;
 	operationRecovery: boolean;
 };
 type DbError = {
@@ -60,6 +61,23 @@ type SqlExecuteOptions = {
 	allowFullTable?: boolean;
 	signal?: AbortSignal;
 };
+
+/** 引用同一事务内先前步骤的一行标量结果；不传递 SQL 片段。 */
+type SqlResultReference = { $result: { step: number; row: number; column: string } };
+
+/** 每项仍是一条参数化 SQL，query 可以读取本事务前序写入。 */
+type SqlTransactionStatement = {
+	intent: "query" | "execute";
+	statement: string;
+	bindings?: readonly (DbScalar | SqlResultReference)[];
+	allowFullTable?: boolean;
+};
+
+/** 按输入顺序返回结果；没有 RETURNING 的成功写入 data 为 null。 */
+type SqlTransactionStepResult = { data: DbRow[] | null; count: number };
+
+/** operationId 供同一请求整体重试；不得更换语句或调用者。 */
+type SqlTransactionOptions = { signal?: AbortSignal; operationId?: string };
 
 /** Fluent 查询的公共过滤方法。 */
 interface FilterMethods<Self> {
@@ -136,6 +154,7 @@ interface TableRef<Row extends object> {
 }
 
 interface Sql {
+	transaction(statements: readonly SqlTransactionStatement[], options?: SqlTransactionOptions): Promise<DbResult<SqlTransactionStepResult[]>>;
 	query<Row extends object = DbRow>(
 		statement: string,
 		bindings?: readonly DbScalar[],

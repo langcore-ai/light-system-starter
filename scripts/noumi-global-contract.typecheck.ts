@@ -10,6 +10,10 @@ import type {
 	NoumiDbRow as RuntimeDbRow,
 	NoumiDbScalar as RuntimeDbScalar,
 	NoumiDbSuccess as RuntimeDbSuccess,
+	NoumiSqlResultReference as RuntimeSqlResultReference,
+	NoumiSqlTransactionStatement as RuntimeSqlTransactionStatement,
+	NoumiSqlTransactionOptions as RuntimeSqlTransactionOptions,
+	NoumiSqlTransactionStepResult as RuntimeSqlTransactionStepResult,
 } from "./noumi-db-sdk";
 import type {
 	NoumiAppStorage as RuntimeAppStorage,
@@ -243,3 +247,9 @@ type _OutsideDatabaseContractMatches = AssertEquivalent<
 /** HTTP 类型必须与真实 Browser Runtime 保持双向兼容。 */
 type HttpRequestContract = AssertEquivalent<IsEquivalent<Noumi.HttpRequest, import("./noumi-browser-runtime-client").NoumiHttpRequest>>;
 type HttpResponseContract = AssertEquivalent<IsEquivalent<Noumi.HttpResponse, import("./noumi-browser-runtime-client").NoumiHttpResponse>>;
+
+/** 原子 SQL 公共类型必须与实际 SDK 双向兼容。 */
+type _SqlResultReferenceMatches = AssertEquivalent<IsEquivalent<Noumi.SqlResultReference, RuntimeSqlResultReference>>;
+type _SqlTransactionStatementMatches = AssertEquivalent<IsEquivalent<Noumi.SqlTransactionStatement, RuntimeSqlTransactionStatement>>;
+type _SqlTransactionOptionsMatches = AssertEquivalent<IsEquivalent<Noumi.SqlTransactionOptions, RuntimeSqlTransactionOptions>>;
+type _SqlTransactionStepResultMatches = AssertEquivalent<IsEquivalent<Noumi.SqlTransactionStepResult, RuntimeSqlTransactionStepResult>>;
