@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "contractVersion": 7,
+  "contractVersion": 8,
   "runtimeProtocolVersion": 1,
-  "starterContractCommit": "4d80c230fc8303cc2cb5b3d4c299c0076706806b",
+  "starterContractCommit": "853b0060d81e195a792949ae58146596f1b5c15f",
   "files": {
-    "src/client/noumi.d.ts": "bd6cbd1363d3a028659ccc70476f5b65de87785f70334300160dd92ffa2b1cdd",
-    "scripts/noumi-browser-runtime-client.ts": "96970b23661f2619ae93a840793dae0a06a8e900ca7f1f09a2bb4f26f2949528",
+    "src/client/noumi.d.ts": "50a16f84a79cc886cd8385dffa33807cdf25e2c72ac530b5fce87e26264dfb1c",
+    "scripts/noumi-browser-runtime-client.ts": "135464ef9d0c97edec6a1f3ae23a9dff009dfb50f98090a4c03951d4a2de00ee",
     "scripts/noumi-db-sdk.ts": "e31337853105dd2855040c2e3046b8a3441a78d2e3c56e5e318492eae39ee22f"
   }
 }
