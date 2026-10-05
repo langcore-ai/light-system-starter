@@ -505,13 +505,19 @@ type HttpSecretReference = { $secret: string; prefix?: string };
 type HttpValue = string | HttpSecretReference;
 /** JSON 可递归包含 Secret 引用；不支持任意模板插值。 */
 type HttpJson = null | boolean | number | string | HttpSecretReference | HttpJson[] | { [key: string]: HttpJson };
-/** 四种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
+/** 五种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
+/** 二进制文件随 multipart 上传；fields 支持既有 Secret 引用。 */
+type HttpMultipart = {
+  fields?: Record<string, HttpValue>;
+  files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
+};
 type HttpBody =
-  | { body?: string; json?: never; form?: never; text?: never }
-  | { body?: never; json: HttpJson; form?: never; text?: never }
-  | { body?: never; json?: never; form: Record<string, HttpValue>; text?: never }
-  | { body?: never; json?: never; form?: never; text: HttpValue[] };
-/** 后端代理公网 HTTP(S)；Secret 仅发往管理员授权的精确 HTTPS origin，不继承平台 Cookie。 */
+  | { body?: string; json?: never; form?: never; text?: never; multipart?: never }
+  | { body?: never; json: HttpJson; form?: never; text?: never; multipart?: never }
+  | { body?: never; json?: never; form: Record<string, HttpValue>; text?: never; multipart?: never }
+  | { body?: never; json?: never; form?: never; text: HttpValue[]; multipart?: never }
+  | { body?: never; json?: never; form?: never; text?: never; multipart: HttpMultipart };
+/** 后端代理公网 HTTP(S)；Secret 仅服务端解析并发往公网 HTTPS，不继承平台 Cookie。 */
 type HttpRequest = {
   url: string;
   method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
@@ -551,10 +557,24 @@ interface Bridge {
 	app: { name: string };
 	createByMember: MemberInfo;
 	/** 公开匿名访问时为空。 */
-	currentMember: MemberInfo | null;
+	currentMember: (MemberInfo & { /** 当前Core稳定成员ID。 */ id: string }) | null;
+  /** 宿主许可后返回有界照片/录音；取消、关页或超时关闭设备。 */
+  media: {
+    recordAudio(options?: { maxDurationMs?: number }): Promise<Blob>;
+    takePhoto(options?: { facingMode?: "user" | "environment" }): Promise<Blob>;
+    cancel(): Promise<void>;
+  };
+  /** 当前应用hash路由；打开外部资源必须由宿主用户确认。 */
+  navigation: {
+    getRoute(): Promise<{ hash: string }>;
+    setHash(hash: string, options?: { replace?: boolean }): Promise<{ hash: string }>;
+    openExternal(url: string): Promise<void>;
+  };
 	diagnostics: Diagnostics;
 	/** 与主前端隔离、按当前轻系统分区的异步浏览器存储。 */
 	localStorage: {
+    /** 同一IndexedDB事务按提交后净额核算；ifMatch不满足时返回NOUMI_STORAGE_CONFLICT。最多128个set/remove/ifMatch键。 */
+    replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void>;
 		setItem(key: string, value: string): Promise<void>;
 		getItem(key: string): Promise<string | null>;
 		removeItem(key: string): Promise<void>;

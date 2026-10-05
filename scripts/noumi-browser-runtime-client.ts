@@ -35,13 +35,19 @@ export type NoumiHttpJson =
   | NoumiHttpSecretReference
   | NoumiHttpJson[]
   | { [key: string]: NoumiHttpJson };
-/** 四种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
+/** 文件上传由平台生成 multipart boundary，二进制字节不会按 UTF-8 转码。 */
+export type NoumiHttpMultipart = {
+  fields?: Record<string, NoumiHttpValue>;
+  files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
+};
+/** 五种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
 export type NoumiHttpBody =
-  | { body?: string; json?: never; form?: never; text?: never }
-  | { body?: never; json: NoumiHttpJson; form?: never; text?: never }
-  | { body?: never; json?: never; form: Record<string, NoumiHttpValue>; text?: never }
-  | { body?: never; json?: never; form?: never; text: NoumiHttpValue[] };
-/** 后端代理公网 HTTP(S)；Secret 仅发往管理员授权的精确 HTTPS origin，不继承平台 Cookie。 */
+  | { body?: string; json?: never; form?: never; text?: never; multipart?: never }
+  | { body?: never; json: NoumiHttpJson; form?: never; text?: never; multipart?: never }
+  | { body?: never; json?: never; form: Record<string, NoumiHttpValue>; text?: never; multipart?: never }
+  | { body?: never; json?: never; form?: never; text: NoumiHttpValue[]; multipart?: never }
+  | { body?: never; json?: never; form?: never; text?: never; multipart: NoumiHttpMultipart };
+/** 后端代理公网 HTTP(S)；Secret 仅服务端解析并发往公网 HTTPS，不继承平台 Cookie。 */
 export type NoumiHttpRequest = {
   url: string;
   method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
@@ -96,7 +102,7 @@ type BootstrapMember = {
 type BootstrapPayload = {
 	app: { name: string };
 	createByMember: BootstrapMember;
-	currentMember: BootstrapMember | null;
+	currentMember: (BootstrapMember & { id: string }) | null;
 	databaseCapabilities: NoumiDbCapabilities;
 	appStorageCapabilities: NoumiFileCapabilities;
 	outsideDbCapabilities: NoumiOutsideDbCapabilities;
@@ -176,6 +182,11 @@ function isMember(value: unknown): value is BootstrapMember {
 	return isRecord(value) &&
 		typeof value.email === "string" &&
 		(value.displayName === null || typeof value.displayName === "string");
+}
+
+/** 当前身份必须包含服务端注入的稳定Core成员ID。 */
+function isCurrentMember(value: unknown): value is BootstrapMember & { id: string } {
+  return isMember(value) && "id" in value && typeof value.id === "string" && value.id.length > 0;
 }
 
 /** 校验数据库 capability 快照；它只用于 UI fallback，不替代服务端鉴权。 */
@@ -288,14 +299,24 @@ addEventListener("message", (event) => {
 	) {
 		return;
 	}
-	if (event.data.type === BRIDGE_BOOTSTRAP_MESSAGE) {
+	if (event.data.type === "noumi:light-system:bridge:route") {
+    // 宿主拥有地址栏，iframe只消费当前应用hash；不重新加载业务页面。
+    if (typeof event.data.hash === "string" && (event.data.hash === "" || event.data.hash.startsWith("#")) &&
+      new TextEncoder().encode(event.data.hash).byteLength <= 8192 && location.hash !== event.data.hash) {
+      const target = new URL(location.href);
+      target.hash = event.data.hash;
+      location.replace(target.href);
+    }
+    return;
+  }
+  if (event.data.type === BRIDGE_BOOTSTRAP_MESSAGE) {
 		const payload = event.data.payload;
 		if (
 			!isRecord(payload) ||
 			!isRecord(payload.app) ||
 			typeof payload.app.name !== "string" ||
 			!isMember(payload.createByMember) ||
-			payload.currentMember !== null && !isMember(payload.currentMember) ||
+			payload.currentMember !== null && !isCurrentMember(payload.currentMember) ||
 			!isDatabaseCapabilities(payload.databaseCapabilities) ||
 			!isAppStorageCapabilities(payload.appStorageCapabilities) ||
 			!isOutsideDbCapabilities(payload.outsideDbCapabilities) ||
@@ -381,7 +402,9 @@ function call(
 				? "workspaceFiles.cancel"
 				: method === "outsideDb.request"
 					? "outsideDb.cancel"
-					: method === "db.request"
+					: method.startsWith("media.") && method !== "media.cancel"
+            ? "media.cancel"
+            : method === "db.request"
 						? "db.cancel"
 						: null;
 		if (signal?.aborted) {
@@ -539,13 +562,17 @@ const bridge = Object.freeze({
 	createByMember: freezeMember(payload.createByMember),
 	currentMember: payload.currentMember === null
 		? null
-		: freezeMember(payload.currentMember),
+		: Object.freeze({ ...freezeMember(payload.currentMember), id: payload.currentMember.id }),
 	diagnostics: Object.freeze({
 		reportError(error: unknown, options?: NoumiReportErrorOptions): void {
 			diagnosticsReporter.reportError(error, options);
 		},
 	}),
 	localStorage: Object.freeze({
+    /** 一次事务替换键集合；ifMatch不满足或净额超限均零修改。 */
+    async replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void> {
+      await call("localStorage.replaceItems", input);
+    },
 		async setItem(key: string, value: string) {
 			await call("localStorage.setItem", {
 				key: requireString(key, "key"),
@@ -586,6 +613,29 @@ const bridge = Object.freeze({
       return await requestHttpCapability(input);
     },
   }),
+  /** 宿主显示真实用户许可界面，结果仍由应用自行处理。 */
+  media: Object.freeze({
+    async recordAudio(options: { maxDurationMs?: number } = {}): Promise<Blob> {
+      const value = await call("media.recordAudio", options, undefined, 210_000);
+      if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
+      return value;
+    },
+    async takePhoto(options: { facingMode?: "user" | "environment" } = {}): Promise<Blob> {
+      const value = await call("media.takePhoto", options, undefined, 150_000);
+      if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
+      return value;
+    },
+    async cancel(): Promise<void> { await call("media.cancel", {}); },
+  }),
+  navigation: Object.freeze({
+    async getRoute(): Promise<{ hash: string }> {
+      return await call("navigation.getRoute", {}) as { hash: string };
+    },
+    async setHash(hash: string, options: { replace?: boolean } = {}): Promise<{ hash: string }> {
+      return await call("navigation.setHash", { hash, replace: options.replace ?? false }) as { hash: string };
+    },
+    async openExternal(url: string): Promise<void> { await call("navigation.openExternal", { url }, undefined, 130_000); },
+  }),
 	appStorage: createNoumiAppStorage(
 		appStorageTransport,
 		payload.appStorageCapabilities,
@@ -603,10 +653,28 @@ const bridge = Object.freeze({
 
 /** 发送结构化 HTTP wire 并校验大小，响应统一按 base64 解码。 */
 async function requestHttpCapability(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
-  const payload = JSON.stringify(input);
-  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 1024 * 1024)
+  let wire: unknown = input;
+  if ("multipart" in input && input.multipart) {
+    const files = [];
+    let fileBytes = 0;
+    for (const file of input.multipart.files) {
+      const size = file.data instanceof Blob ? file.data.size : file.data.byteLength;
+      fileBytes += size;
+      if (fileBytes > 4 * 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
+      const bytes = file.data instanceof Blob ? new Uint8Array(await file.data.arrayBuffer())
+        : file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 16 * 1024) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 16 * 1024));
+      }
+      files.push({ name: file.name, filename: file.filename, contentType: file.contentType, dataBase64: btoa(binary) });
+    }
+    wire = { ...input, multipart: { fields: input.multipart.fields, files } };
+  }
+  const payload = JSON.stringify(wire);
+  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 6 * 1024 * 1024)
     throw new TypeError("HTTP request exceeds limit");
-  const response = await call("http.request", input, undefined, 40_000);
+  const response = await call("http.request", wire, undefined, 40_000);
   if (isRecord(response) && "httpError" in response) {
     const failure = response.httpError;
     if (
