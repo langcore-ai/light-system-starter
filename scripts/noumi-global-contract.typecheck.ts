@@ -28,6 +28,7 @@ import type {
 	NoumiFileCapabilities as RuntimeFileCapabilities,
 	NoumiFileDownloadUrl as RuntimeFileDownloadUrl,
 	NoumiFileDownloadUrlOptions as RuntimeFileDownloadUrlOptions,
+	NoumiGeneratedFileDownloadOptions as RuntimeGeneratedFileDownloadOptions,
 	NoumiFileInput as RuntimeFileInput,
 	NoumiFileRange as RuntimeFileRange,
 	NoumiFileTransportError as RuntimeFileTransportError,
@@ -84,6 +85,7 @@ type GlobalAppStorageContract = {
 	range: Noumi.FileRange;
 	download: Noumi.FileDownloadUrl;
 	downloadOptions: Noumi.FileDownloadUrlOptions;
+	generatedDownloadOptions: Noumi.GeneratedFileDownloadOptions;
 	object: Noumi.AppStorageObject;
 	file: Noumi.AppStorageFile;
 	putOptions: Noumi.AppStoragePutOptions;
@@ -103,6 +105,7 @@ type RuntimeAppStorageContract = {
 	range: RuntimeFileRange;
 	download: RuntimeFileDownloadUrl;
 	downloadOptions: RuntimeFileDownloadUrlOptions;
+	generatedDownloadOptions: RuntimeGeneratedFileDownloadOptions;
 	object: RuntimeAppStorageObject;
 	file: RuntimeAppStorageFile;
 	putOptions: RuntimeAppStoragePutOptions;

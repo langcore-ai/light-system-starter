@@ -102,6 +102,8 @@ type BootstrapMember = {
 type BootstrapPayload = {
 	/** 文件内容传输由宿主统一执行。 */
 	hostFileTransfer?: boolean;
+	/** Shell 支持无持久化的临时 File/Blob 下载，和存储授权独立。 */
+	generatedFileDownload?: boolean;
 	app: { name: string };
 	createByMember: BootstrapMember;
 	currentMember: (BootstrapMember & { id: string }) | null;
@@ -571,6 +573,8 @@ const fileHostTransport = (scope: "appStorage" | "workspaceFiles") => async (
 	method: "uploadFile" | "readFile" | "downloadFile", input: Record<string, unknown>, options?: { signal?: AbortSignal },
 ) => {
 	if (payload.hostFileTransfer !== true) throw new Error("NOUMI_FILE_HOST_TRANSFER_REQUIRED");
+	// 新 SDK 不能把本地 Blob 请求发给旧 Shell 再退回 iframe 自行下载。
+	if (method === "downloadFile" && input.file instanceof Blob && payload.generatedFileDownload !== true) throw Object.assign(new Error("NOUMI_GENERATED_FILE_DOWNLOAD_UNAVAILABLE"), { code: "NOUMI_GENERATED_FILE_DOWNLOAD_UNAVAILABLE", requestId: "local", retryable: false });
 	return await call(`${scope}.${method}`, input, options?.signal, 310_000);
 };
 

@@ -91,6 +91,12 @@ export type NoumiFileDownloadUrlOptions = {
 	signal?: AbortSignal;
 };
 
+/** 保存前端已生成的文件；不提供存储版本条件或预览选项。 */
+export type NoumiGeneratedFileDownloadOptions = {
+	fileName?: string;
+	signal?: AbortSignal;
+};
+
 /** 只承载取消信号的通用请求选项。 */
 export type NoumiAppStorageRequestOptions = {
 	signal?: AbortSignal;
@@ -119,6 +125,8 @@ export interface NoumiAppStorage {
 	readFile(path: string, options?: NoumiAppStorageGetOptions): Promise<Blob>;
 	/** 宿主发起浏览器下载；不承诺已保存到用户设备。 */
 	downloadFile(path: string, options?: NoumiFileDownloadUrlOptions): Promise<{ initiated: true }>;
+	/** 临时导出交给 Shell 下载，不创建持久存储对象。 */
+	downloadFile(file: File | Blob, options?: NoumiGeneratedFileDownloadOptions): Promise<{ initiated: true }>;
 	put(
 		path: string,
 		data: NoumiFileInput,
@@ -546,8 +554,11 @@ export function createNoumiAppStorage(
 		get,
 		uploadFile: put,
 		async readFile(path: string, options: NoumiAppStorageGetOptions = {}): Promise<Blob> { return (await get(path, options)).body; },
-		async downloadFile(path: string, options: NoumiFileDownloadUrlOptions = {}): Promise<{ initiated: true }> {
-			const result = await host("downloadFile", { path, fileName: options.fileName ?? null }, options.signal);
+		async downloadFile(source: string | Blob, options: NoumiFileDownloadUrlOptions = {}): Promise<{ initiated: true }> {
+			// 本地导出不请求存储票据，明确拒绝把预览选项误用到浏览器保存。
+			if (source instanceof Blob && Object.keys(options).some((key) => !["fileName", "signal"].includes(key))) throw new NoumiAppStorageError({ code: "NOUMI_FILE_INVALID_REQUEST", message: "Generated download only accepts fileName and signal", requestId: "local", retryable: false });
+			const input = source instanceof Blob ? { file: source, fileName: options.fileName ?? null } : { path: source, fileName: options.fileName ?? null };
+			const result = await host("downloadFile", input, options.signal);
 			if (!isRecord(result) || result.initiated !== true) throw invalidTransportResponse("Noumi file download response is invalid");
 			return { initiated: true };
 		},

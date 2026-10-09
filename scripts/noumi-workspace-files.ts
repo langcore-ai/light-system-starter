@@ -6,6 +6,7 @@ import type {
 	NoumiFileRange,
 	NoumiFileTransportError,
 	NoumiFileHostTransport,
+	NoumiGeneratedFileDownloadOptions,
 } from "./noumi-app-storage";
 
 /** Workspace Files wire protocol 固定版本。 */
@@ -122,6 +123,8 @@ export interface NoumiWorkspaceFiles {
 	readonly capabilities: Readonly<NoumiFileCapabilities>;
 	/** 由Shell触发下载，不把文件URL或正文交给iframe。 */
 	downloadFile(path: string, options?: NoumiWorkspaceDownloadUrlOptions): Promise<{ initiated: true }>;
+	/** 临时导出由 Shell 保存，与 Workspace 存储读取权限无关。 */
+	downloadFile(file: File | Blob, options?: NoumiGeneratedFileDownloadOptions): Promise<{ initiated: true }>;
 	stat(
 		path: string,
 		options?: NoumiWorkspaceRequestOptions,
@@ -671,8 +674,11 @@ export function createNoumiWorkspaceFiles(
 			if (upload.body.size > capabilities.maxFileBytes) throw new NoumiWorkspaceFilesError({ code: "NOUMI_WORKSPACE_LIMIT_EXCEEDED", message: "Workspace file exceeds the byte limit", requestId: "local", retryable: false });
 			return parseEntry(await host("uploadFile", { path, file: upload.body, contentType: upload.contentType, overwrite: options.overwrite === true, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null }, options.signal));
 		},
-		async downloadFile(path: string, options: NoumiWorkspaceDownloadUrlOptions = {}): Promise<{ initiated: true }> {
-			const result = await host("downloadFile", { path, fileName: options.fileName ?? null, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null }, options.signal);
+		async downloadFile(source: string | Blob, options: NoumiWorkspaceDownloadUrlOptions = {}): Promise<{ initiated: true }> {
+			// 前端生成内容没有 Workspace node/revision，不能悄悄忽略调用者的版本条件。
+			if (source instanceof Blob && Object.keys(options).some((key) => !["fileName", "signal"].includes(key))) throw new NoumiWorkspaceFilesError({ code: "NOUMI_FILE_INVALID_REQUEST", message: "Generated download only accepts fileName and signal", requestId: "local", retryable: false });
+			const input = source instanceof Blob ? { file: source, fileName: options.fileName ?? null } : { path: source, fileName: options.fileName ?? null, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null };
+			const result = await host("downloadFile", input, options.signal);
 			if (!isRecord(result) || result.initiated !== true) throw invalidTransportResponse("Noumi Workspace download response is invalid");
 			return { initiated: true };
 		},

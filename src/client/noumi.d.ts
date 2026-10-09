@@ -248,6 +248,11 @@ type FileDownloadUrlOptions = {
 	fileName?: string;
 	signal?: AbortSignal;
 };
+/** 前端生成的 File/Blob 下载选项；不包含存储条件与预览。 */
+type GeneratedFileDownloadOptions = {
+	fileName?: string;
+	signal?: AbortSignal;
+};
 type AppStorageRequestOptions = ExecuteOptions;
 type FileTransportError = Error & {
 	code: "NOUMI_FILE_TRANSPORT";
@@ -263,6 +268,8 @@ interface AppStorage {
 	readFile(path: string, options?: AppStorageGetOptions): Promise<Blob>;
 	/** 宿主发起浏览器下载，不承诺本地保存成功。 */
 	downloadFile(path: string, options?: FileDownloadUrlOptions): Promise<{ initiated: true }>;
+	/** 由宿主保存临时导出，不上传到存储。 */
+	downloadFile(file: File | Blob, options?: GeneratedFileDownloadOptions): Promise<{ initiated: true }>;
 	readonly capabilities: Readonly<FileCapabilities>;
 	put(
 		path: string,
@@ -370,6 +377,8 @@ type WorkspaceRequestOptions = ExecuteOptions;
 interface WorkspaceFiles {
 	/** 由宿主发起浏览器下载，不将签名地址交给iframe。 */
 	downloadFile(path: string, options?: WorkspaceDownloadUrlOptions): Promise<{ initiated: true }>;
+	/** 由宿主保存临时导出，不读取 Workspace 文件。 */
+	downloadFile(file: File | Blob, options?: GeneratedFileDownloadOptions): Promise<{ initiated: true }>;
 	readonly capabilities: Readonly<FileCapabilities>;
 	stat(
 		path: string,
