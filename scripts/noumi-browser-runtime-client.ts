@@ -28,50 +28,50 @@ export type NoumiHttpSecretReference = { $secret: string; prefix?: string };
 export type NoumiHttpValue = string | NoumiHttpSecretReference;
 /** JSON 可递归包含 Secret 引用；不支持任意模板插值。 */
 export type NoumiHttpJson =
-  | null
-  | boolean
-  | number
-  | string
-  | NoumiHttpSecretReference
-  | NoumiHttpJson[]
-  | { [key: string]: NoumiHttpJson };
+	| null
+	| boolean
+	| number
+	| string
+	| NoumiHttpSecretReference
+	| NoumiHttpJson[]
+	| { [key: string]: NoumiHttpJson };
 /** 文件上传由平台生成 multipart boundary，二进制字节不会按 UTF-8 转码。 */
 export type NoumiHttpMultipart = {
-  fields?: Record<string, NoumiHttpValue>;
-  files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
+	fields?: Record<string, NoumiHttpValue>;
+	files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
 };
 /** 五种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
 export type NoumiHttpBody =
-  | { body?: string; json?: never; form?: never; text?: never; multipart?: never }
-  | { body?: never; json: NoumiHttpJson; form?: never; text?: never; multipart?: never }
-  | { body?: never; json?: never; form: Record<string, NoumiHttpValue>; text?: never; multipart?: never }
-  | { body?: never; json?: never; form?: never; text: NoumiHttpValue[]; multipart?: never }
-  | { body?: never; json?: never; form?: never; text?: never; multipart: NoumiHttpMultipart };
+	| { body?: string; json?: never; form?: never; text?: never; multipart?: never }
+	| { body?: never; json: NoumiHttpJson; form?: never; text?: never; multipart?: never }
+	| { body?: never; json?: never; form: Record<string, NoumiHttpValue>; text?: never; multipart?: never }
+	| { body?: never; json?: never; form?: never; text: NoumiHttpValue[]; multipart?: never }
+	| { body?: never; json?: never; form?: never; text?: never; multipart: NoumiHttpMultipart };
 /** 后端代理公网 HTTP(S)；Secret 仅服务端解析并发往公网 HTTPS，不继承平台 Cookie。 */
 export type NoumiHttpRequest = {
-  url: string;
-  method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  headers?: Record<string, NoumiHttpValue>;
-  query?: Record<string, NoumiHttpValue>;
-  /** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
-  pathSegments?: NoumiHttpValue[];
-  /** 默认 30000，允许 100–30000 毫秒。 */
-  timeoutMs?: number;
+	url: string;
+	method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+	headers?: Record<string, NoumiHttpValue>;
+	query?: Record<string, NoumiHttpValue>;
+	/** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
+	pathSegments?: NoumiHttpValue[];
+	/** 默认 30000，允许 100–30000 毫秒。 */
+	timeoutMs?: number;
 } & NoumiHttpBody;
 /** 平台 HTTP 错误；catch 后按 code/outcome 等属性收窄，unknown 不得自动重试。 */
 export type NoumiHttpError = Error & {
-  readonly code: string;
-  readonly secretName?: string;
-  readonly requiredPermission?: "project-admin";
-  readonly outcome: "not-sent" | "unknown";
+	readonly code: string;
+	readonly secretName?: string;
+	readonly requiredPermission?: "project-admin";
+	readonly outcome: "not-sent" | "unknown";
 };
 /** HTTP 响应同时保留文本和解码传输压缩后的二进制 base64 表示。 */
 export type NoumiHttpResponse = {
-  status: number;
-  statusText: string;
-  headers: Array<[string, string]>;
-  body: string;
-  bodyBase64: string;
+	status: number;
+	statusText: string;
+	headers: Array<[string, string]>;
+	body: string;
+	bodyBase64: string;
 };
 
 /** iframe Bridge 协议版本；必须和主平台可信外壳保持一致。 */
@@ -100,6 +100,8 @@ type BootstrapMember = {
 
 /** Bridge bootstrap payload。 */
 type BootstrapPayload = {
+	/** 文件内容传输由宿主统一执行。 */
+	hostFileTransfer?: boolean;
 	app: { name: string };
 	createByMember: BootstrapMember;
 	currentMember: (BootstrapMember & { id: string }) | null;
@@ -186,7 +188,7 @@ function isMember(value: unknown): value is BootstrapMember {
 
 /** 当前身份必须包含服务端注入的稳定Core成员ID。 */
 function isCurrentMember(value: unknown): value is BootstrapMember & { id: string } {
-  return isMember(value) && "id" in value && typeof value.id === "string" && value.id.length > 0;
+	return isMember(value) && "id" in value && typeof value.id === "string" && value.id.length > 0;
 }
 
 /** 校验数据库 capability 快照；它只用于 UI fallback，不替代服务端鉴权。 */
@@ -300,16 +302,16 @@ addEventListener("message", (event) => {
 		return;
 	}
 	if (event.data.type === "noumi:light-system:bridge:route") {
-    // 宿主拥有地址栏，iframe只消费当前应用hash；不重新加载业务页面。
-    if (typeof event.data.hash === "string" && (event.data.hash === "" || event.data.hash.startsWith("#")) &&
-      new TextEncoder().encode(event.data.hash).byteLength <= 8192 && location.hash !== event.data.hash) {
-      const target = new URL(location.href);
-      target.hash = event.data.hash;
-      location.replace(target.href);
-    }
-    return;
-  }
-  if (event.data.type === BRIDGE_BOOTSTRAP_MESSAGE) {
+		// 宿主拥有地址栏，iframe只消费当前应用hash；不重新加载业务页面。
+		if (typeof event.data.hash === "string" && (event.data.hash === "" || event.data.hash.startsWith("#")) &&
+			new TextEncoder().encode(event.data.hash).byteLength <= 8192 && location.hash !== event.data.hash) {
+			const target = new URL(location.href);
+			target.hash = event.data.hash;
+			location.replace(target.href);
+		}
+		return;
+	}
+	if (event.data.type === BRIDGE_BOOTSTRAP_MESSAGE) {
 		const payload = event.data.payload;
 		if (
 			!isRecord(payload) ||
@@ -346,15 +348,22 @@ addEventListener("message", (event) => {
 	clearTimeout(active.timer);
 	if (event.data.ok === true) active.resolve(event.data.result);
 	else {
-		active.reject(
-			createBridgeCallError(
+		const failure = createBridgeCallError(
 				typeof event.data.error === "string"
 					? event.data.error
 					: "Noumi capability call failed",
 				event.data.requestId,
 				"unknown",
-			),
-		);
+			);
+		// 受信宿主返回原requestId与outcome，不能把明确业务拒绝统一改成结果未知。
+		const details = event.data.errorDetails;
+		if (isRecord(details)) {
+			if (typeof details.code === "string") Object.assign(failure, { code: details.code });
+			if (typeof details.requestId === "string") failure.requestId = details.requestId;
+			if (details.outcome === "not-sent" || details.outcome === "unknown") failure.outcome = details.outcome;
+		}
+		if (isRecord(details)) Object.assign(failure, { retryable: details.retryable === true, currentEtag: details.currentEtag });
+		active.reject(failure);
 	}
 });
 
@@ -396,15 +405,15 @@ function call(
 	return new Promise((resolve, reject) => {
 		// UUID 避免同一 Light System 的多成员、多 tab 在同一毫秒产生碰撞。
 		const requestId = createNoumiRequestId();
-		const cancelMethod = method === "appStorage.request"
+		const cancelMethod = /^(appStorage|workspaceFiles)\.(uploadFile|readFile|downloadFile)$/.test(method) ? "files.cancel" : method === "appStorage.request"
 			? "appStorage.cancel"
 			: method === "workspaceFiles.request"
 				? "workspaceFiles.cancel"
 				: method === "outsideDb.request"
 					? "outsideDb.cancel"
 					: method.startsWith("media.") && method !== "media.cancel"
-            ? "media.cancel"
-            : method === "db.request"
+						? "media.cancel"
+						: method === "db.request"
 						? "db.cancel"
 						: null;
 		if (signal?.aborted) {
@@ -505,7 +514,7 @@ const databaseTransport: NoumiDbTransport = async (request, options) => {
 	});
 };
 
-/** App Storage control JSON 通过可信父外壳；文件 bytes 由 SDK 直接走 ticket URL。 */
+/** App Storage 元数据控制面通过可信父外壳；二进制传输使用独立宿主RPC。 */
 const appStorageTransport: NoumiAppStorageControlTransport = async (
 	request,
 	options,
@@ -520,7 +529,7 @@ const appStorageTransport: NoumiAppStorageControlTransport = async (
 	});
 };
 
-/** Workspace Files control JSON 通过可信父外壳；bytes 直接走 ticket URL。 */
+/** Workspace Files 元数据控制面通过可信父外壳；文件bytes由宿主执行。 */
 const workspaceFilesTransport: NoumiWorkspaceFilesControlTransport = async (
 	request,
 	options,
@@ -557,6 +566,14 @@ const outsideDbTransport: NoumiOutsideDbTransport = async (
 };
 
 const payload = await bootstrap;
+/** 大文件不经JSON控制面，File/Blob随RPC结构化克隆给Shell。 */
+const fileHostTransport = (scope: "appStorage" | "workspaceFiles") => async (
+	method: "uploadFile" | "readFile" | "downloadFile", input: Record<string, unknown>, options?: { signal?: AbortSignal },
+) => {
+	if (payload.hostFileTransfer !== true) throw new Error("NOUMI_FILE_HOST_TRANSFER_REQUIRED");
+	return await call(`${scope}.${method}`, input, options?.signal, 310_000);
+};
+
 const bridge = Object.freeze({
 	app: Object.freeze({ name: payload.app.name }),
 	createByMember: freezeMember(payload.createByMember),
@@ -569,10 +586,10 @@ const bridge = Object.freeze({
 		},
 	}),
 	localStorage: Object.freeze({
-    /** 一次事务替换键集合；ifMatch不满足或净额超限均零修改。 */
-    async replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void> {
-      await call("localStorage.replaceItems", input);
-    },
+		/** 一次事务替换键集合；ifMatch不满足或净额超限均零修改。 */
+		async replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void> {
+			await call("localStorage.replaceItems", input);
+		},
 		async setItem(key: string, value: string) {
 			await call("localStorage.setItem", {
 				key: requireString(key, "key"),
@@ -608,41 +625,43 @@ const bridge = Object.freeze({
 		},
 	}),
 	http: Object.freeze({
-    /** 将请求交给可信外壳；不会在轻系统浏览器内发起外部 fetch。 */
-    async request(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
-      return await requestHttpCapability(input);
-    },
-  }),
-  /** 宿主显示真实用户许可界面，结果仍由应用自行处理。 */
-  media: Object.freeze({
-    async recordAudio(options: { maxDurationMs?: number } = {}): Promise<Blob> {
-      const value = await call("media.recordAudio", options, undefined, 210_000);
-      if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
-      return value;
-    },
-    async takePhoto(options: { facingMode?: "user" | "environment" } = {}): Promise<Blob> {
-      const value = await call("media.takePhoto", options, undefined, 150_000);
-      if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
-      return value;
-    },
-    async cancel(): Promise<void> { await call("media.cancel", {}); },
-  }),
-  navigation: Object.freeze({
-    async getRoute(): Promise<{ hash: string }> {
-      return await call("navigation.getRoute", {}) as { hash: string };
-    },
-    async setHash(hash: string, options: { replace?: boolean } = {}): Promise<{ hash: string }> {
-      return await call("navigation.setHash", { hash, replace: options.replace ?? false }) as { hash: string };
-    },
-    async openExternal(url: string): Promise<void> { await call("navigation.openExternal", { url }, undefined, 130_000); },
-  }),
+		/** 将请求交给可信外壳；不会在轻系统浏览器内发起外部 fetch。 */
+		async request(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
+			return await requestHttpCapability(input);
+		},
+	}),
+	/** 宿主显示真实用户许可界面，结果仍由应用自行处理。 */
+	media: Object.freeze({
+		async recordAudio(options: { maxDurationMs?: number } = {}): Promise<Blob> {
+			const value = await call("media.recordAudio", options, undefined, 210_000);
+			if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
+			return value;
+		},
+		async takePhoto(options: { facingMode?: "user" | "environment" } = {}): Promise<Blob> {
+			const value = await call("media.takePhoto", options, undefined, 150_000);
+			if (!(value instanceof Blob)) throw new TypeError("Invalid media result");
+			return value;
+		},
+		async cancel(): Promise<void> { await call("media.cancel", {}); },
+	}),
+	navigation: Object.freeze({
+		async getRoute(): Promise<{ hash: string }> {
+			return await call("navigation.getRoute", {}) as { hash: string };
+		},
+		async setHash(hash: string, options: { replace?: boolean } = {}): Promise<{ hash: string }> {
+			return await call("navigation.setHash", { hash, replace: options.replace ?? false }) as { hash: string };
+		},
+		async openExternal(url: string): Promise<void> { await call("navigation.openExternal", { url }, undefined, 130_000); },
+	}),
 	appStorage: createNoumiAppStorage(
 		appStorageTransport,
 		payload.appStorageCapabilities,
+		fileHostTransport("appStorage"),
 	),
 	workspaceFiles: createNoumiWorkspaceFiles(
 		workspaceFilesTransport,
 		payload.workspaceFilesCapabilities,
+		fileHostTransport("workspaceFiles"),
 	),
 	outsideDb: createNoumiOutsideDb(
 		outsideDbTransport,
@@ -653,71 +672,71 @@ const bridge = Object.freeze({
 
 /** 发送结构化 HTTP wire 并校验大小，响应统一按 base64 解码。 */
 async function requestHttpCapability(input: NoumiHttpRequest): Promise<NoumiHttpResponse> {
-  let wire: unknown = input;
-  if ("multipart" in input && input.multipart) {
-    const files = [];
-    let fileBytes = 0;
-    for (const file of input.multipart.files) {
-      const size = file.data instanceof Blob ? file.data.size : file.data.byteLength;
-      fileBytes += size;
-      if (fileBytes > 4 * 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
-      const bytes = file.data instanceof Blob ? new Uint8Array(await file.data.arrayBuffer())
-        : file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
-      let binary = "";
-      for (let offset = 0; offset < bytes.length; offset += 16 * 1024) {
-        binary += String.fromCharCode(...bytes.subarray(offset, offset + 16 * 1024));
-      }
-      files.push({ name: file.name, filename: file.filename, contentType: file.contentType, dataBase64: btoa(binary) });
-    }
-    wire = { ...input, multipart: { fields: input.multipart.fields, files } };
-  }
-  const payload = JSON.stringify(wire);
-  if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 6 * 1024 * 1024)
-    throw new TypeError("HTTP request exceeds limit");
-  const response = await call("http.request", wire, undefined, 40_000);
-  if (isRecord(response) && "httpError" in response) {
-    const failure = response.httpError;
-    if (
-      !isRecord(failure) ||
-      typeof failure.code !== "string" ||
-      !/^(?:NOUMI_[A-Z0-9_]{1,100}|project_secret_[a-z_]{1,100})$/.test(failure.code) ||
-      (failure.outcome !== "not-sent" && failure.outcome !== "unknown")
-    ) {
-      throw new TypeError("Invalid HTTP Bridge response");
-    }
-    const error: NoumiHttpError = Object.assign(new Error(failure.code), {
-      code: failure.code,
-      outcome: failure.outcome,
-      ...(typeof failure.secretName === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(failure.secretName)
-        ? { secretName: failure.secretName }
-        : {}),
-      ...(failure.requiredPermission === "project-admin" ? { requiredPermission: "project-admin" as const } : {}),
-    } as const);
-    throw error;
-  }
-  const result = response as {
-    status: number;
-    statusText: string;
-    headers: Array<[string, string]>;
-    body: string;
-    bodyEncoding: string;
-  };
-  if (
-    !result ||
-    result.bodyEncoding !== "base64" ||
-    typeof result.body !== "string" ||
-    !Number.isInteger(result.status) ||
-    !Array.isArray(result.headers)
-  )
-    throw new TypeError("Invalid HTTP Bridge response");
-  const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
-  return {
-    status: result.status,
-    statusText: result.statusText,
-    headers: result.headers,
-    body: new TextDecoder().decode(bytes),
-    bodyBase64: result.body,
-  };
+	let wire: unknown = input;
+	if ("multipart" in input && input.multipart) {
+		const files = [];
+		let fileBytes = 0;
+		for (const file of input.multipart.files) {
+			const size = file.data instanceof Blob ? file.data.size : file.data.byteLength;
+			fileBytes += size;
+			if (fileBytes > 4 * 1024 * 1024) throw new TypeError("HTTP request exceeds limit");
+			const bytes = file.data instanceof Blob ? new Uint8Array(await file.data.arrayBuffer())
+				: file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
+			let binary = "";
+			for (let offset = 0; offset < bytes.length; offset += 16 * 1024) {
+				binary += String.fromCharCode(...bytes.subarray(offset, offset + 16 * 1024));
+			}
+			files.push({ name: file.name, filename: file.filename, contentType: file.contentType, dataBase64: btoa(binary) });
+		}
+		wire = { ...input, multipart: { fields: input.multipart.fields, files } };
+	}
+	const payload = JSON.stringify(wire);
+	if (typeof payload !== "string" || new TextEncoder().encode(payload).byteLength > 6 * 1024 * 1024)
+		throw new TypeError("HTTP request exceeds limit");
+	const response = await call("http.request", wire, undefined, 40_000);
+	if (isRecord(response) && "httpError" in response) {
+		const failure = response.httpError;
+		if (
+			!isRecord(failure) ||
+			typeof failure.code !== "string" ||
+			!/^(?:NOUMI_[A-Z0-9_]{1,100}|project_secret_[a-z_]{1,100})$/.test(failure.code) ||
+			(failure.outcome !== "not-sent" && failure.outcome !== "unknown")
+		) {
+			throw new TypeError("Invalid HTTP Bridge response");
+		}
+		const error: NoumiHttpError = Object.assign(new Error(failure.code), {
+			code: failure.code,
+			outcome: failure.outcome,
+			...(typeof failure.secretName === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(failure.secretName)
+				? { secretName: failure.secretName }
+				: {}),
+			...(failure.requiredPermission === "project-admin" ? { requiredPermission: "project-admin" as const } : {}),
+		} as const);
+		throw error;
+	}
+	const result = response as {
+		status: number;
+		statusText: string;
+		headers: Array<[string, string]>;
+		body: string;
+		bodyEncoding: string;
+	};
+	if (
+		!result ||
+		result.bodyEncoding !== "base64" ||
+		typeof result.body !== "string" ||
+		!Number.isInteger(result.status) ||
+		!Array.isArray(result.headers)
+	)
+		throw new TypeError("Invalid HTTP Bridge response");
+	const bytes = Uint8Array.from(atob(result.body), (char) => char.charCodeAt(0));
+	return {
+		status: result.status,
+		statusText: result.statusText,
+		headers: result.headers,
+		body: new TextDecoder().decode(bytes),
+		bodyBase64: result.body,
+	};
 }
 
 Object.defineProperty(window, "NoumiBridge", {

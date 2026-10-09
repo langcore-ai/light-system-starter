@@ -1,12 +1,6 @@
 /** App Storage wire protocol 固定版本。 */
 const APP_STORAGE_PROTOCOL_VERSION = 1 as const;
 
-/** transfer response 中的公开对象 metadata。 */
-const APP_STORAGE_OBJECT_HEADER = "x-noumi-app-storage-object";
-
-/** transfer response 中的实际 range。 */
-const APP_STORAGE_RANGE_HEADER = "x-noumi-app-storage-range";
-
 /** App Storage bootstrap 能力。 */
 export type NoumiFileCapabilities = {
 	protocolVersion: 1;
@@ -109,9 +103,22 @@ export type NoumiFileTransportError = Error & {
 	outcome: "not-sent" | "unknown";
 };
 
+/** 宿主文件 RPC；文件对象结构化克隆，不能接收或指定 provider URL。 */
+export type NoumiFileHostTransport = (
+	method: "uploadFile" | "readFile" | "downloadFile",
+	input: Record<string, unknown>,
+	options?: { signal?: AbortSignal },
+) => Promise<unknown>;
+
 /** App Storage SDK。 */
 export interface NoumiAppStorage {
 	readonly capabilities: Readonly<NoumiFileCapabilities>;
+	/** 由宿主完成上传，成功返回正式对象，不返回票据。 */
+	uploadFile(path: string, file: File | Blob, options?: NoumiAppStoragePutOptions): Promise<NoumiAppStorageObject>;
+	/** 读取内容供应用解析，网络读取在宿主执行。 */
+	readFile(path: string, options?: NoumiAppStorageGetOptions): Promise<Blob>;
+	/** 宿主发起浏览器下载；不承诺已保存到用户设备。 */
+	downloadFile(path: string, options?: NoumiFileDownloadUrlOptions): Promise<{ initiated: true }>;
 	put(
 		path: string,
 		data: NoumiFileInput,
@@ -288,32 +295,6 @@ function parseObject(value: unknown): NoumiAppStorageObject {
 	});
 }
 
-/** 严格解码无 padding base64url JSON header。 */
-function decodeHeaderJson(value: string | null): unknown {
-	if (!value || !/^[A-Za-z0-9_-]+$/.test(value)) {
-		throw invalidTransportResponse(
-			"Noumi App Storage transfer metadata is missing",
-		);
-	}
-	try {
-		const padded = value.replace(/-/g, "+").replace(/_/g, "/")
-			.padEnd(Math.ceil(value.length / 4) * 4, "=");
-		const binary = atob(padded);
-		const bytes = Uint8Array.from(
-			binary,
-			(character) => character.charCodeAt(0),
-		);
-		return JSON.parse(
-			new TextDecoder("utf-8", {
-				fatal: true,
-				ignoreBOM: false,
-			}).decode(bytes),
-		) as unknown;
-	} catch (error) {
-		throw transportError(error, "unknown");
-	}
-}
-
 /** 从统一 failure envelope 抛出稳定业务错误。 */
 async function throwResponseError(response: Response): Promise<never> {
 	let parsed: unknown;
@@ -420,35 +401,15 @@ function parseTransfer(value: unknown): {
 	return { url: url.href, expiresAt: value.expiresAt };
 }
 
-/** 发起二进制 transfer，并区分尚未发送与结果未知。 */
-async function requestTransfer(
-	transferFetch: typeof fetch,
-	url: string,
-	init: RequestInit,
-	signal?: AbortSignal,
-): Promise<Response> {
-	if (signal?.aborted) {
-		throw transportError(
-			signal.reason ?? new DOMException("Aborted", "AbortError"),
-			"not-sent",
-		);
-	}
-	try {
-		return await transferFetch(url, { ...init, signal });
-	} catch (error) {
-		throw transportError(error, "unknown");
-	}
-}
-
 /** mutation recovery 的内部成功标记。 */
 type MutationRecoveryAttempt =
 	| { recovered: true; data: unknown }
 	| { recovered: false };
 
 /**
- * unknown outcome 只查询同一 request ID 的持久化结果。
- * 查询失败时保留原始错误，不使用新 request ID 重放 mutation。
- */
+	* unknown outcome 只查询同一 request ID 的持久化结果。
+	* 查询失败时保留原始错误，不使用新 request ID 重放 mutation。
+	*/
 async function recoverUnknownMutation(
 	transport: NoumiAppStorageControlTransport,
 	error: unknown,
@@ -476,15 +437,6 @@ async function recoverUnknownMutation(
 		return { recovered: true, data: recovered.data };
 	} catch {
 		return { recovered: false };
-	}
-}
-
-/** 完整读取 transfer body；流中断同样属于 unknown transport outcome。 */
-async function readTransferBlob(response: Response): Promise<Blob> {
-	try {
-		return await response.blob();
-	} catch (error) {
-		throw transportError(error, "unknown");
 	}
 }
 
@@ -526,6 +478,16 @@ function createUploadBody(
 	);
 }
 
+/** 校验宿主回传的范围，保留旧读取接口的公开契约。 */
+function parseRange(value: unknown): { offset: number; length: number; totalSize: number } | null {
+	if (value === null) return null;
+	if (!isRecord(value) || ![value.offset, value.length, value.totalSize].every(Number.isSafeInteger) ||
+		Number(value.offset) < 0 || Number(value.length) < 0 || Number(value.offset) + Number(value.length) > Number(value.totalSize)) {
+		throw invalidTransportResponse("Noumi file range response is invalid");
+	}
+	return { offset: Number(value.offset), length: Number(value.length), totalSize: Number(value.totalSize) };
+}
+
 /** 校验 bootstrap capability。 */
 function freezeCapabilities(
 	value: NoumiFileCapabilities,
@@ -543,145 +505,51 @@ function freezeCapabilities(
 }
 
 /**
- * 创建 App Storage SDK。
- * control 只传公开参数；put/get bytes 使用 credentials=omit 的 ticket data plane。
- */
+	* 创建 App Storage SDK。
+	* control 只传公开参数；文件 bytes 由宿主执行，iframe 不收到上传 URL。
+	*/
 export function createNoumiAppStorage(
 	transport: NoumiAppStorageControlTransport,
 	capabilitiesInput: NoumiFileCapabilities,
-	transferFetch: typeof fetch = fetch,
+	hostTransport?: NoumiFileHostTransport,
 ): NoumiAppStorage {
 	const capabilities = freezeCapabilities(capabilitiesInput);
+	/** SDK 只规范化输入；传输和回执的唯一 owner 是当前 Shell。 */
+	const host = (method: "uploadFile" | "readFile" | "downloadFile", input: Record<string, unknown>, signal?: AbortSignal) => {
+		if (signal?.aborted) throw transportError(signal.reason, "not-sent");
+		if (!hostTransport) throw transportError(new Error("NOUMI_FILE_HOST_TRANSFER_REQUIRED"), "not-sent");
+		return hostTransport(method, input, { signal }).catch((error: unknown) => {
+			if (isRecord(error) && typeof error.code === "string" && error.code !== "NOUMI_FILE_TRANSPORT") throw new NoumiAppStorageError({
+				code: error.code, message: typeof error.message === "string" ? error.message : error.code,
+				requestId: typeof error.requestId === "string" ? error.requestId : "unknown", retryable: error.retryable === true,
+				...(typeof error.currentEtag === "string" ? { currentEtag: error.currentEtag } : {}),
+			});
+			throw transportError(error, "unknown");
+		});
+	};
+	/** 老 put 与新 uploadFile 同一条宿主路径，不能保留 iframe fetch 兜底。 */
+	const put = async (path: string, data: NoumiFileInput, options: NoumiAppStoragePutOptions = {}): Promise<NoumiAppStorageObject> => {
+		const upload = createUploadBody(data, options.contentType);
+		if (upload.body.size > capabilities.maxFileBytes) throw new NoumiAppStorageError({ code: "NOUMI_APP_STORAGE_LIMIT_EXCEEDED", message: "App Storage file exceeds the byte limit", requestId: "local", retryable: false });
+		return parseObject(await host("uploadFile", { path, file: upload.body, contentType: upload.contentType, metadata: options.metadata ?? {}, ifMatch: options.ifMatch ?? null, ifNoneMatch: options.ifNoneMatch === true }, options.signal));
+	};
+	/** 老 get 保留元数据和 range，新 readFile 只提取同一结果的 Blob。 */
+	const get = async (path: string, options: NoumiAppStorageGetOptions = {}): Promise<NoumiAppStorageFile> => {
+		const result = await host("readFile", { path, range: options.range ?? null, ifMatch: options.ifMatch ?? null }, options.signal);
+		if (!isRecord(result) || !(result.body instanceof Blob)) throw invalidTransportResponse("Noumi App Storage file response is invalid");
+		const metadata = parseObject(result);
+		return Object.freeze({ ...metadata, body: result.body, range: parseRange(result.range) });
+	};
 	return Object.freeze({
 		capabilities,
-		async put(
-			path: string,
-			data: NoumiFileInput,
-			options: NoumiAppStoragePutOptions = {},
-		): Promise<NoumiAppStorageObject> {
-			const upload = createUploadBody(data, options.contentType);
-			if (upload.body.size > capabilities.maxFileBytes) {
-				throw new NoumiAppStorageError({
-					code: "NOUMI_APP_STORAGE_LIMIT_EXCEEDED",
-					message: "App Storage file exceeds the byte limit",
-					requestId: "local",
-					retryable: false,
-				});
-			}
-			const control = await requestControl(
-				transport,
-				"preparePut",
-				{
-					path,
-					size: upload.body.size,
-					contentType: upload.contentType,
-					metadata: options.metadata ?? {},
-					ifMatch: options.ifMatch ?? null,
-					ifNoneMatch: options.ifNoneMatch === true,
-				},
-				options.signal,
-			);
-			try {
-				const transfer = parseTransfer(control.data);
-				const response = await requestTransfer(transferFetch, transfer.url, {
-					method: "PUT",
-					headers: { "content-type": upload.contentType },
-					body: upload.body,
-					cache: "no-store",
-					credentials: "omit",
-					redirect: "error",
-				}, options.signal);
-				if (!response.ok) return throwResponseError(response);
-				let parsed: unknown;
-				try {
-					parsed = await response.json();
-				} catch (error) {
-					throw transportError(error, "unknown");
-				}
-				if (
-					!isRecord(parsed) ||
-					parsed.version !== 1 ||
-					parsed.ok !== true
-				) {
-					throw invalidTransportResponse(
-						"Noumi App Storage upload response is invalid",
-					);
-				}
-				return parseObject(parsed.data);
-			} catch (error) {
-				const failure = attachTransportRequestId(
-					error,
-					control.requestId,
-				);
-				const recovered = await recoverUnknownMutation(
-					transport,
-					failure,
-					"put",
-					path,
-				);
-				if (recovered.recovered) {
-					try {
-						return parseObject(recovered.data);
-					} catch {
-						// malformed recovery 不能覆盖原始 unknown-outcome 错误。
-					}
-				}
-				throw failure;
-			}
-		},
-		async get(
-			path: string,
-			options: NoumiAppStorageGetOptions = {},
-		): Promise<NoumiAppStorageFile> {
-			const control = await requestControl(
-				transport,
-				"prepareGet",
-				{
-					path,
-					range: options.range ?? null,
-					ifMatch: options.ifMatch ?? null,
-				},
-				options.signal,
-			);
-			try {
-				const transfer = parseTransfer(control.data);
-				const response = await requestTransfer(transferFetch, transfer.url, {
-					method: "GET",
-					cache: "no-store",
-					credentials: "omit",
-					redirect: "error",
-				}, options.signal);
-				if (!response.ok) return throwResponseError(response);
-				const object = parseObject(
-					decodeHeaderJson(response.headers.get(APP_STORAGE_OBJECT_HEADER)),
-				);
-				const rangeHeader = response.headers.get(APP_STORAGE_RANGE_HEADER);
-				const range = rangeHeader ? decodeHeaderJson(rangeHeader) : null;
-				if (
-					range !== null &&
-					(!isRecord(range) ||
-						!Number.isSafeInteger(range.offset) ||
-						!Number.isSafeInteger(range.length) ||
-						!Number.isSafeInteger(range.totalSize))
-				) {
-					throw invalidTransportResponse(
-						"Noumi App Storage range response is invalid",
-					);
-				}
-				return Object.freeze({
-					...object,
-					body: await readTransferBlob(response),
-					range: range === null
-						? null
-						: {
-							offset: Number(range.offset),
-							length: Number(range.length),
-							totalSize: Number(range.totalSize),
-						},
-				});
-			} catch (error) {
-				return throwWithTransportRequestId(error, control.requestId);
-			}
+		put,
+		get,
+		uploadFile: put,
+		async readFile(path: string, options: NoumiAppStorageGetOptions = {}): Promise<Blob> { return (await get(path, options)).body; },
+		async downloadFile(path: string, options: NoumiFileDownloadUrlOptions = {}): Promise<{ initiated: true }> {
+			const result = await host("downloadFile", { path, fileName: options.fileName ?? null }, options.signal);
+			if (!isRecord(result) || result.initiated !== true) throw invalidTransportResponse("Noumi file download response is invalid");
+			return { initiated: true };
 		},
 		async head(
 			path: string,

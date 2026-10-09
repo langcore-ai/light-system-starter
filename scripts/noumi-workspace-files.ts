@@ -5,16 +5,11 @@ import type {
 	NoumiFileInput,
 	NoumiFileRange,
 	NoumiFileTransportError,
+	NoumiFileHostTransport,
 } from "./noumi-app-storage";
 
 /** Workspace Files wire protocol 固定版本。 */
 const WORKSPACE_FILES_PROTOCOL_VERSION = 1 as const;
-
-/** transfer response 中的公开 Workspace entry。 */
-const WORKSPACE_FILES_ENTRY_HEADER = "x-noumi-workspace-entry";
-
-/** transfer response 中的实际 range。 */
-const WORKSPACE_FILES_RANGE_HEADER = "x-noumi-workspace-range";
 
 /** Workspace 中的公开文件或目录。 */
 export type NoumiWorkspaceEntry = {
@@ -125,6 +120,8 @@ export type NoumiWorkspaceRequestOptions = {
 /** Workspace Files SDK。 */
 export interface NoumiWorkspaceFiles {
 	readonly capabilities: Readonly<NoumiFileCapabilities>;
+	/** 由Shell触发下载，不把文件URL或正文交给iframe。 */
+	downloadFile(path: string, options?: NoumiWorkspaceDownloadUrlOptions): Promise<{ initiated: true }>;
 	stat(
 		path: string,
 		options?: NoumiWorkspaceRequestOptions,
@@ -324,32 +321,6 @@ function parseFileEntry(
 	};
 }
 
-/** 严格解码无 padding base64url JSON header。 */
-function decodeHeaderJson(value: string | null): unknown {
-	if (!value || !/^[A-Za-z0-9_-]+$/.test(value)) {
-		throw invalidTransportResponse(
-			"Noumi Workspace transfer metadata is missing",
-		);
-	}
-	try {
-		const padded = value.replace(/-/g, "+").replace(/_/g, "/")
-			.padEnd(Math.ceil(value.length / 4) * 4, "=");
-		const binary = atob(padded);
-		const bytes = Uint8Array.from(
-			binary,
-			(character) => character.charCodeAt(0),
-		);
-		return JSON.parse(
-			new TextDecoder("utf-8", {
-				fatal: true,
-				ignoreBOM: false,
-			}).decode(bytes),
-		) as unknown;
-	} catch (error) {
-		throw transportError(error, "unknown");
-	}
-}
-
 /** 从统一 failure envelope 抛出稳定业务错误。 */
 async function throwResponseError(response: Response): Promise<never> {
 	let parsed: unknown;
@@ -456,26 +427,6 @@ function parseTransfer(value: unknown): {
 	return { url: url.href, expiresAt: value.expiresAt };
 }
 
-/** 发起二进制 transfer。 */
-async function requestTransfer(
-	transferFetch: typeof fetch,
-	url: string,
-	init: RequestInit,
-	signal?: AbortSignal,
-): Promise<Response> {
-	if (signal?.aborted) {
-		throw transportError(
-			signal.reason ?? new DOMException("Aborted", "AbortError"),
-			"not-sent",
-		);
-	}
-	try {
-		return await transferFetch(url, { ...init, signal });
-	} catch (error) {
-		throw transportError(error, "unknown");
-	}
-}
-
 /** 把公共输入归一化为 Blob；文件 bytes 不进入 Bridge JSON。 */
 function createUploadBody(
 	data: NoumiFileInput,
@@ -518,13 +469,14 @@ function createUploadBody(
 	);
 }
 
-/** 完整读取 transfer body；流中断属于 unknown outcome。 */
-async function readTransferBlob(response: Response): Promise<Blob> {
-	try {
-		return await response.blob();
-	} catch (error) {
-		throw transportError(error, "unknown");
+/** 校验宿主回传的范围，保留旧读取接口的公开契约。 */
+function parseRange(value: unknown): { offset: number; length: number; totalSize: number } | null {
+	if (value === null) return null;
+	if (!isRecord(value) || ![value.offset, value.length, value.totalSize].every(Number.isSafeInteger) ||
+		Number(value.offset) < 0 || Number(value.length) < 0 || Number(value.offset) + Number(value.length) > Number(value.totalSize)) {
+		throw invalidTransportResponse("Noumi file range response is invalid");
 	}
+	return { offset: Number(value.offset), length: Number(value.length), totalSize: Number(value.totalSize) };
 }
 
 /** 校验 bootstrap capability。 */
@@ -621,73 +573,26 @@ async function requestMutation(
 export function createNoumiWorkspaceFiles(
 	transport: NoumiWorkspaceFilesControlTransport,
 	capabilitiesInput: NoumiFileCapabilities,
-	transferFetch: typeof fetch = fetch,
+	hostTransport?: NoumiFileHostTransport,
 ): NoumiWorkspaceFiles {
 	const capabilities = freezeCapabilities(capabilitiesInput);
-	const readFile = async (
-		path: string,
-		options: NoumiWorkspaceReadOptions = {},
-	): Promise<NoumiWorkspaceFile> => {
-		const control = await requestControl(
-			transport,
-			"prepareRead",
-			{
-				path,
-				range: options.range ?? null,
-				ifMatch: options.ifMatch ?? null,
-				expectedNodeId: options.expectedNodeId ?? null,
-			},
-			options.signal,
-		);
-		try {
-			const transfer = parseTransfer(control.data);
-			const response = await requestTransfer(
-				transferFetch,
-				transfer.url,
-				{
-					method: "GET",
-					cache: "no-store",
-					credentials: "omit",
-					redirect: "error",
-				},
-				options.signal,
-			);
-			if (!response.ok) return throwResponseError(response);
-			const entry = parseFileEntry(
-				decodeHeaderJson(
-					response.headers.get(WORKSPACE_FILES_ENTRY_HEADER),
-				),
-			);
-			const encodedRange =
-				response.headers.get(WORKSPACE_FILES_RANGE_HEADER);
-			const parsedRange = encodedRange
-				? decodeHeaderJson(encodedRange)
-				: null;
-			if (
-				parsedRange !== null &&
-				(!isRecord(parsedRange) ||
-					!Number.isSafeInteger(parsedRange.offset) ||
-					!Number.isSafeInteger(parsedRange.length) ||
-					!Number.isSafeInteger(parsedRange.totalSize))
-			) {
-				throw invalidTransportResponse(
-					"Noumi Workspace range response is invalid",
-				);
-			}
-			return Object.freeze({
-				entry,
-				body: await readTransferBlob(response),
-				range: parsedRange === null
-					? null
-					: {
-						offset: Number(parsedRange.offset),
-						length: Number(parsedRange.length),
-						totalSize: Number(parsedRange.totalSize),
-					},
+	/** 网络传输全部交给同一 Shell，不向 iframe 返回 prepare ticket。 */
+	const host = (method: "uploadFile" | "readFile" | "downloadFile", input: Record<string, unknown>, signal?: AbortSignal) => {
+		if (signal?.aborted) throw transportError(signal.reason, "not-sent");
+		if (!hostTransport) throw transportError(new Error("NOUMI_FILE_HOST_TRANSFER_REQUIRED"), "not-sent");
+		return hostTransport(method, input, { signal }).catch((error: unknown) => {
+			if (isRecord(error) && typeof error.code === "string" && error.code !== "NOUMI_FILE_TRANSPORT") throw new NoumiWorkspaceFilesError({
+				code: error.code, message: typeof error.message === "string" ? error.message : error.code,
+				requestId: typeof error.requestId === "string" ? error.requestId : "unknown", retryable: error.retryable === true,
+				...(typeof error.currentEtag === "string" ? { currentEtag: error.currentEtag } : {}),
 			});
-		} catch (error) {
-			return throwWithTransportRequestId(error, control.requestId);
-		}
+			throw transportError(error, "unknown");
+		});
+	};
+	const readFile = async (path: string, options: NoumiWorkspaceReadOptions = {}): Promise<NoumiWorkspaceFile> => {
+		const result = await host("readFile", { path, range: options.range ?? null, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null }, options.signal);
+		if (!isRecord(result) || !(result.body instanceof Blob)) throw invalidTransportResponse("Noumi Workspace file response is invalid");
+		return Object.freeze({ entry: parseFileEntry(result.entry), body: result.body, range: parseRange(result.range) });
 	};
 	return Object.freeze({
 		capabilities,
@@ -761,86 +666,15 @@ export function createNoumiWorkspaceFiles(
 				});
 			}
 		},
-		async writeFile(
-			path: string,
-			data: NoumiFileInput,
-			options: NoumiWorkspaceWriteOptions = {},
-		): Promise<NoumiWorkspaceEntry> {
+		async writeFile(path: string, data: NoumiFileInput, options: NoumiWorkspaceWriteOptions = {}): Promise<NoumiWorkspaceEntry> {
 			const upload = createUploadBody(data, options.contentType);
-			if (upload.body.size > capabilities.maxFileBytes) {
-				throw new NoumiWorkspaceFilesError({
-					code: "NOUMI_WORKSPACE_LIMIT_EXCEEDED",
-					message: "Workspace file exceeds the byte limit",
-					requestId: "local",
-					retryable: false,
-				});
-			}
-			const control = await requestControl(
-				transport,
-				"prepareWrite",
-				{
-					path,
-					size: upload.body.size,
-					contentType: upload.contentType,
-					overwrite: options.overwrite === true,
-					ifMatch: options.ifMatch ?? null,
-					expectedNodeId: options.expectedNodeId ?? null,
-				},
-				options.signal,
-			);
-			try {
-				const transfer = parseTransfer(control.data);
-				const response = await requestTransfer(
-					transferFetch,
-					transfer.url,
-					{
-						method: "PUT",
-						headers: { "content-type": upload.contentType },
-						body: upload.body,
-						cache: "no-store",
-						credentials: "omit",
-						redirect: "error",
-					},
-					options.signal,
-				);
-				if (!response.ok) return throwResponseError(response);
-				let parsed: unknown;
-				try {
-					parsed = await response.json();
-				} catch (error) {
-					throw transportError(error, "unknown");
-				}
-				if (
-					!isRecord(parsed) ||
-					parsed.version !== 1 ||
-					parsed.ok !== true
-				) {
-					throw invalidTransportResponse(
-						"Noumi Workspace upload response is invalid",
-					);
-				}
-				return parseEntry(parsed.data);
-			} catch (error) {
-				const failure = attachTransportRequestId(
-					error,
-					control.requestId,
-				);
-				const recovered = await recoverUnknownMutation(
-					transport,
-					failure,
-					"write",
-					path,
-					null,
-				);
-				if (recovered.recovered) {
-					try {
-						return parseEntry(recovered.data);
-					} catch {
-						// 畸形恢复响应不能覆盖原始 unknown-outcome 错误。
-					}
-				}
-				throw failure;
-			}
+			if (upload.body.size > capabilities.maxFileBytes) throw new NoumiWorkspaceFilesError({ code: "NOUMI_WORKSPACE_LIMIT_EXCEEDED", message: "Workspace file exceeds the byte limit", requestId: "local", retryable: false });
+			return parseEntry(await host("uploadFile", { path, file: upload.body, contentType: upload.contentType, overwrite: options.overwrite === true, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null }, options.signal));
+		},
+		async downloadFile(path: string, options: NoumiWorkspaceDownloadUrlOptions = {}): Promise<{ initiated: true }> {
+			const result = await host("downloadFile", { path, fileName: options.fileName ?? null, ifMatch: options.ifMatch ?? null, expectedNodeId: options.expectedNodeId ?? null }, options.signal);
+			if (!isRecord(result) || result.initiated !== true) throw invalidTransportResponse("Noumi Workspace download response is invalid");
+			return { initiated: true };
 		},
 		async createDirectory(
 			path: string,

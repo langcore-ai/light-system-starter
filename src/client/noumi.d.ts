@@ -1,11 +1,11 @@
 /**
- * NoumiBridge 自包含公共类型契约。
- * 必须保持单文件、无 import，并由 noumi-global-contract.typecheck.ts 校验 Runtime 对齐。
- */
+	* NoumiBridge 自包含公共类型契约。
+	* 必须保持单文件、无 import，并由 noumi-global-contract.typecheck.ts 校验 Runtime 对齐。
+	*/
 
 /**
- * 轻系统公开类型统一收口在 Noumi 命名空间，避免短类型名污染业务全局作用域。
- */
+	* 轻系统公开类型统一收口在 Noumi 命名空间，避免短类型名污染业务全局作用域。
+	*/
 declare namespace Noumi {
 
 // Database
@@ -257,6 +257,12 @@ type FileTransportError = Error & {
 
 /** 当前轻系统独享、跨 deployment 保留的对象存储。 */
 interface AppStorage {
+	/** 文件对象交给宿主上传，返回正式文件引用。 */
+	uploadFile(path: string, file: File | Blob, options?: AppStoragePutOptions): Promise<AppStorageObject>;
+	/** 宿主读取后返回Blob供业务处理。 */
+	readFile(path: string, options?: AppStorageGetOptions): Promise<Blob>;
+	/** 宿主发起浏览器下载，不承诺本地保存成功。 */
+	downloadFile(path: string, options?: FileDownloadUrlOptions): Promise<{ initiated: true }>;
 	readonly capabilities: Readonly<FileCapabilities>;
 	put(
 		path: string,
@@ -362,6 +368,8 @@ type WorkspaceRequestOptions = ExecuteOptions;
 
 /** 当前 Project 的协作 Workspace 文件能力。 */
 interface WorkspaceFiles {
+	/** 由宿主发起浏览器下载，不将签名地址交给iframe。 */
+	downloadFile(path: string, options?: WorkspaceDownloadUrlOptions): Promise<{ initiated: true }>;
 	readonly capabilities: Readonly<FileCapabilities>;
 	stat(
 		path: string,
@@ -508,42 +516,42 @@ type HttpJson = null | boolean | number | string | HttpSecretReference | HttpJso
 /** 五种正文形式互斥；省略所有正文适用于 GET/HEAD。 */
 /** 二进制文件随 multipart 上传；fields 支持既有 Secret 引用。 */
 type HttpMultipart = {
-  fields?: Record<string, HttpValue>;
-  files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
+	fields?: Record<string, HttpValue>;
+	files: Array<{ name: string; filename: string; contentType?: string; data: Blob | Uint8Array | ArrayBuffer }>;
 };
 type HttpBody =
-  | { body?: string; json?: never; form?: never; text?: never; multipart?: never }
-  | { body?: never; json: HttpJson; form?: never; text?: never; multipart?: never }
-  | { body?: never; json?: never; form: Record<string, HttpValue>; text?: never; multipart?: never }
-  | { body?: never; json?: never; form?: never; text: HttpValue[]; multipart?: never }
-  | { body?: never; json?: never; form?: never; text?: never; multipart: HttpMultipart };
+	| { body?: string; json?: never; form?: never; text?: never; multipart?: never }
+	| { body?: never; json: HttpJson; form?: never; text?: never; multipart?: never }
+	| { body?: never; json?: never; form: Record<string, HttpValue>; text?: never; multipart?: never }
+	| { body?: never; json?: never; form?: never; text: HttpValue[]; multipart?: never }
+	| { body?: never; json?: never; form?: never; text?: never; multipart: HttpMultipart };
 /** 后端代理公网 HTTP(S)；Secret 仅服务端解析并发往公网 HTTPS，不继承平台 Cookie。 */
 type HttpRequest = {
-  url: string;
-  method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  headers?: Record<string, HttpValue>;
-  query?: Record<string, HttpValue>;
-  /** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
-  pathSegments?: HttpValue[];
-  /** 默认 30000，允许 100–30000 毫秒。 */
-  timeoutMs?: number;
+	url: string;
+	method?: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+	headers?: Record<string, HttpValue>;
+	query?: Record<string, HttpValue>;
+	/** 追加到固定 URL path，各段独立编码；URL 不得包含 query。 */
+	pathSegments?: HttpValue[];
+	/** 默认 30000，允许 100–30000 毫秒。 */
+	timeoutMs?: number;
 } & HttpBody;
 /** 平台 HTTP 错误；catch 后按 code/outcome 等属性收窄，unknown 不得自动重试。 */
 type HttpError = Error & {
-  readonly code: string;
-  readonly secretName?: string;
-  readonly requiredPermission?: "project-admin";
-  readonly outcome: "not-sent" | "unknown";
+	readonly code: string;
+	readonly secretName?: string;
+	readonly requiredPermission?: "project-admin";
+	readonly outcome: "not-sent" | "unknown";
 };
 /** 外部响应；4xx/5xx 原样返回，传输错误 reject 且不能假定未产生副作用。 */
 type HttpResponse = {
-  status: number;
-  statusText: string;
-  headers: Array<[string, string]>;
-  /** 响应正文按 UTF-8 解码；JSON 可使用 JSON.parse(body)。 */
-  body: string;
-  /** 解码 HTTP 传输压缩后的正文 base64，供二进制内容使用。 */
-  bodyBase64: string;
+	status: number;
+	statusText: string;
+	headers: Array<[string, string]>;
+	/** 响应正文按 UTF-8 解码；JSON 可使用 JSON.parse(body)。 */
+	body: string;
+	/** 解码 HTTP 传输压缩后的正文 base64，供二进制内容使用。 */
+	bodyBase64: string;
 };
 
 // Bridge
@@ -558,23 +566,23 @@ interface Bridge {
 	createByMember: MemberInfo;
 	/** 公开匿名访问时为空。 */
 	currentMember: (MemberInfo & { /** 当前Core稳定成员ID。 */ id: string }) | null;
-  /** 宿主许可后返回有界照片/录音；取消、关页或超时关闭设备。 */
-  media: {
-    recordAudio(options?: { maxDurationMs?: number }): Promise<Blob>;
-    takePhoto(options?: { facingMode?: "user" | "environment" }): Promise<Blob>;
-    cancel(): Promise<void>;
-  };
-  /** 当前应用hash路由；打开外部资源必须由宿主用户确认。 */
-  navigation: {
-    getRoute(): Promise<{ hash: string }>;
-    setHash(hash: string, options?: { replace?: boolean }): Promise<{ hash: string }>;
-    openExternal(url: string): Promise<void>;
-  };
+	/** 宿主许可后返回有界照片/录音；取消、关页或超时关闭设备。 */
+	media: {
+		recordAudio(options?: { maxDurationMs?: number }): Promise<Blob>;
+		takePhoto(options?: { facingMode?: "user" | "environment" }): Promise<Blob>;
+		cancel(): Promise<void>;
+	};
+	/** 当前应用hash路由；打开外部资源必须由宿主用户确认。 */
+	navigation: {
+		getRoute(): Promise<{ hash: string }>;
+		setHash(hash: string, options?: { replace?: boolean }): Promise<{ hash: string }>;
+		openExternal(url: string): Promise<void>;
+	};
 	diagnostics: Diagnostics;
 	/** 与主前端隔离、按当前轻系统分区的异步浏览器存储。 */
 	localStorage: {
-    /** 同一IndexedDB事务按提交后净额核算；ifMatch不满足时返回NOUMI_STORAGE_CONFLICT。最多128个set/remove/ifMatch键。 */
-    replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void>;
+		/** 同一IndexedDB事务按提交后净额核算；ifMatch不满足时返回NOUMI_STORAGE_CONFLICT。最多128个set/remove/ifMatch键。 */
+		replaceItems(input: { set: Record<string, string>; remove?: string[]; ifMatch?: Record<string, string | null> }): Promise<void>;
 		setItem(key: string, value: string): Promise<void>;
 		getItem(key: string): Promise<string | null>;
 		removeItem(key: string): Promise<void>;
